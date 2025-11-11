@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FOMC经济数据浏览器</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --light-bg: #f8f9fa;
+            --dark-bg: #343a40;
+            --card-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            --card-border: 1px solid rgba(0, 0, 0, 0.125);
+        }
+        
+        body {
+            background-color: var(--light-bg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), #1a2530);
+            color: white;
+            padding: 1.5rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        
+        .card {
+            box-shadow: var(--card-shadow);
+            border: var(--card-border);
+            margin-bottom: 1.5rem;
+            border-radius: 0.5rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        
+        .indicator-card {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+        
+        .indicator-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.2);
+        }
+        
+        .indicator-card .card-body {
+            padding: 1.25rem;
+        }
+        
+        .indicator-card h5 {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .indicator-card h6 {
+            font-weight: 500;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin-top: 1rem;
+        }
+        
+        .data-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .footer {
+            background-color: var(--dark-bg);
+            color: white;
+            padding: 1.5rem 0;
+            margin-top: 2rem;
+        }
+        
+        .filter-section {
+            background: linear-gradient(to right, #edf2f7, #e2e8f0);
+            padding: 1.25rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+        }
+        
+        .filter-section .form-label {
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+        
+        .btn-primary {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: #2980b9;
+            border-color: #2980b9;
+        }
+        
+        .btn-light {
+            background-color: white;
+            border-color: #ddd;
+        }
+        
+        .btn-light:hover {
+            background-color: #f8f9fa;
+            border-color: #ccc;
+        }
+        
+        .table-dark {
+            background-color: var(--primary-color);
+        }
+        
+        /* 响应式设计增强 */
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem 0;
+                text-align: center;
+            }
+            
+            .header h1 {
+                font-size: 1.75rem;
+            }
+            
+            .filter-section {
+                padding: 1rem;
+            }
+            
+            .chart-container {
+                height: 300px;
+            }
+            
+            .data-table-container {
+                max-height: 300px;
+            }
+            
+            .footer {
+                text-align: center;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .container {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .filter-section .row > div {
+                margin-bottom: 1rem;
+            }
+            
+            .filter-section .row > div:last-child {
+                margin-bottom: 0;
+            }
+            
+            .chart-container {
+                height: 250px;
+            }
+            
+            .card-body {
+                padding: 1rem;
+            }
+        }
+        
+        /* 加载动画 */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 滚动条样式 */
+        .data-table-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .data-table-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        .data-table-container::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        .data-table-container::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="bi bi-bar-chart-line"></i> FOMC经济数据浏览器</h1>
+                    <p class="mb-0">美联储公开市场委员会经济指标数据可视化平台</p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <button class="btn btn-light" id="refreshBtn">
+                        <i class="bi bi-arrow-repeat"></i> 刷新数据
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="indicatorSelect" class="form-label">选择经济指标</label>
+                    <select class="form-select" id="indicatorSelect">
+                        <option value="">全部指标</option>
+                        <!-- 动态填充指标选项 -->
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="dateRange" class="form-label">时间范围</label>
+                    <select class="form-select" id="dateRange">
+                        <option value="1Y">最近1年</option>
+                        <option value="3Y" selected>最近3年</option>
+                        <option value="5Y">最近5年</option>
+                        <option value="10Y">最近10年</option>
+                        <option value="all">全部数据</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="sortOrder" class="form-label">排序方式</label>
+                    <select class="form-select" id="sortOrder">
+                        <option value="date_desc">按日期降序</option>
+                        <option value="date_asc">按日期升序</option>
+                        <option value="value_desc">按数值降序</option>
+                        <option value="value_asc">按数值升序</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="row" id="summaryCards">
+            <!-- 动态填充指标卡片 -->
+        </div>
+
+        <!-- Chart Section -->
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> 数据趋势图</h5>
+                <div>
+                    <button class="btn btn-sm btn-light me-2" id="lineChartBtn">折线图</button>
+                    <button class="btn btn-sm btn-light" id="barChartBtn">柱状图</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="dataChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-table"></i> 数据表格</h5>
+            </div>
+            <div class="card-body">
+                <div class="data-table-container">
+                    <table class="table table-striped table-hover" id="dataTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>指标名称</th>
+                                <th>日期</th>
+                                <th>数值</th>
+                                <th>单位</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 动态填充数据行 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-0">&copy; 2025 FOMC经济数据分析项目</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0">数据来源: Federal Reserve Economic Data (FRED)</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 全局变量
+        let currentChart = null;
+        let chartType = 'line'; // 默认图表类型
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadIndicators();
+            loadSummaryData();
+            loadDataTable();
+            initializeChart();
+            
+            // 绑定事件监听器
+            document.getElementById('indicatorSelect').addEventListener('change', updateVisualization);
+            document.getElementById('dateRange').addEventListener('change', updateVisualization);
+            document.getElementById('sortOrder').addEventListener('change', updateVisualization);
+            document.getElementById('lineChartBtn').addEventListener('click', function() {
+                chartType = 'line';
+                updateVisualization();
+            });
+            document.getElementById('barChartBtn').addEventListener('click', function() {
+                chartType = 'bar';
+                updateVisualization();
+            });
+            document.getElementById('refreshBtn').addEventListener('click', refreshData);
+        });
+
+        // 显示消息
+        function showMessage(message, type) {
+            // 移除现有的消息
+            const existingAlert = document.querySelector('.alert');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+            
+            // 创建新的消息元素
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.role = 'alert';
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            // 插入到页面顶部
+            const container = document.querySelector('.container');
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            // 3秒后自动消失
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 3000);
+        }
+
+        // 显示加载状态
+        function showLoading(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                // 特殊处理表格元素
+                if (elementId === 'dataTable') {
+                    const tbody = element.querySelector('tbody');
+                    if (tbody) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4"><div class="loading mx-auto"></div><p class="mt-2">加载中...</p></td></tr>';
+                    }
+                } else {
+                    element.innerHTML = '<div class="text-center py-4"><div class="loading mx-auto"></div><p class="mt-2">加载中...</p></div>';
+                }
+            }
+        }
+
+        // 显示错误信息
+        function showError(elementId, message) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                // 特殊处理表格元素
+                if (elementId === 'dataTable') {
+                    const tbody = element.querySelector('tbody');
+                    if (tbody) {
+                        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">加载失败: ${message}</td></tr>`;
+                    }
+                } else {
+                    element.innerHTML = `<div class="alert alert-danger text-center py-4">加载失败: ${message}</div>`;
+                }
+            }
+        }
+
+        // 加载经济指标列表
+        function loadIndicators() {
+            fetch('/api/indicators')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应错误');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const select = document.getElementById('indicatorSelect');
+                    // 保存当前选中的值
+                    const currentValue = select.value;
+                    // 清空选项
+                    select.innerHTML = '<option value="">全部指标</option>';
+                    // 添加新选项
+                    data.forEach(indicator => {
+                        const option = document.createElement('option');
+                        option.value = indicator.id;
+                        option.textContent = indicator.name + ' (' + indicator.code + ')';
+                        select.appendChild(option);
+                    });
+                    // 恢复之前的选中值
+                    if (currentValue) {
+                        select.value = currentValue;
+                    }
+                })
+                .catch(error => {
+                    console.error('加载指标列表失败:', error);
+                    alert('加载指标列表失败: ' + error.message);
+                });
+        }
+
+        // 加载摘要数据
+        function loadSummaryData() {
+            showLoading('summaryCards');
+            fetch('/api/summary')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应错误');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const container = document.getElementById('summaryCards');
+                    container.innerHTML = '';
+                    data.forEach(indicator => {
+                        const card = document.createElement('div');
+                        card.className = 'col-md-4 mb-3';
+                        card.innerHTML = `
+                            <div class="card indicator-card h-100" onclick="selectIndicator(${indicator.id})">
+                                <div class="card-body">
+                                    <h5 class="card-title">${indicator.name}</h5>
+                                    <h6 class="card-subtitle mb-2 text-muted">${indicator.code}</h6>
+                                    <p class="card-text">
+                                        <strong>最新值:</strong> ${indicator.latest_value !== null ? indicator.latest_value : 'N/A'} ${indicator.units}<br>
+                                        <strong>最新日期:</strong> ${indicator.latest_date || 'N/A'}<br>
+                                        <strong>数据点数:</strong> ${indicator.data_point_count}
+                                    </p>
+                                </div>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    });
+                })
+                .catch(error => {
+                    console.error('加载摘要数据失败:', error);
+                    showError('summaryCards', error.message);
+                });
+        }
+
+        // 加载数据表格
+        function loadDataTable() {
+            showLoading('dataTable');
+            fetch('/api/data')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应错误');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const tbody = document.querySelector('#dataTable tbody');
+                    tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center">暂无数据</td></tr>';
+                        return;
+                    }
+                    data.forEach(point => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${point.indicator_name}</td>
+                            <td>${point.date}</td>
+                            <td>${point.value}</td>
+                            <td>${point.units}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                })
+                .catch(error => {
+                    console.error('加载数据表格失败:', error);
+                    const tbody = document.querySelector('#dataTable tbody');
+                    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">加载失败: ${error.message}</td></tr>`;
+                });
+        }
+
+        // 初始化图表
+        function initializeChart() {
+            const ctx = document.getElementById('dataChart').getContext('2d');
+            currentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '经济指标数据',
+                        data: [],
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // 更新可视化
+        function updateVisualization() {
+            const indicatorId = document.getElementById('indicatorSelect').value;
+            const dateRange = document.getElementById('dateRange').value;
+            const sortOrder = document.getElementById('sortOrder').value;
+            
+            // 显示图表加载状态
+            if (currentChart) {
+                currentChart.destroy();
+            }
+            const chartCtx = document.getElementById('dataChart').getContext('2d');
+            currentChart = new Chart(chartCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '加载中...',
+                        data: [],
+                        borderColor: 'rgba(0, 0, 0, 0.1)',
+                        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+            
+            // 显示表格加载状态
+            showLoading('dataTable');
+            
+            // 更新图表
+            fetch(`/api/chart-data?indicator_id=${indicatorId}&date_range=${dateRange}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应错误');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (currentChart) {
+                        currentChart.destroy();
+                    }
+                    
+                    const ctx = document.getElementById('dataChart').getContext('2d');
+                    currentChart = new Chart(ctx, {
+                        type: chartType,
+                        data: {
+                            labels: data.dates,
+                            datasets: [{
+                                label: data.indicator_name,
+                                data: data.values,
+                                borderColor: 'rgb(54, 162, 235)',
+                                backgroundColor: chartType === 'line' ? 'rgba(54, 162, 235, 0.2)' : 'rgba(54, 162, 235, 0.6)',
+                                tension: 0.1,
+                                fill: chartType === 'line'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: false
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    labels: {
+                                        font: {
+                                            size: 14
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                    titleFont: {
+                                        size: 14
+                                    },
+                                    bodyFont: {
+                                        size: 13
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('更新图表失败:', error);
+                    if (currentChart) {
+                        currentChart.destroy();
+                    }
+                    const ctx = document.getElementById('dataChart').getContext('2d');
+                    currentChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                label: '加载失败',
+                                data: [],
+                                borderColor: 'rgba(255, 0, 0, 0.5)',
+                                backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                                tension: 0.1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: false
+                                }
+                            }
+                        }
+                    });
+                });
+            
+            // 更新表格
+            fetch(`/api/data?indicator_id=${indicatorId}&date_range=${dateRange}&sort_order=${sortOrder}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应错误');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const tbody = document.querySelector('#dataTable tbody');
+                    tbody.innerHTML = '';
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center">暂无数据</td></tr>';
+                        return;
+                    }
+                    data.forEach(point => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${point.indicator_name}</td>
+                            <td>${point.date}</td>
+                            <td>${point.value}</td>
+                            <td>${point.units}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                })
+                .catch(error => {
+                    console.error('更新数据表格失败:', error);
+                    const tbody = document.querySelector('#dataTable tbody');
+                    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">加载失败: ${error.message}</td></tr>`;
+                });
+        }
+
+        // 选择指标
+        function selectIndicator(indicatorId) {
+            document.getElementById('indicatorSelect').value = indicatorId;
+            updateVisualization();
+        }
+
+        // 刷新数据
+        function refreshData() {
+            // 显示刷新状态
+            const refreshBtn = document.getElementById('refreshBtn');
+            const originalText = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 刷新中...';
+            refreshBtn.disabled = true;
+            
+            fetch('/api/refresh-data', { method: 'POST' })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应错误');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // 显示成功消息
+                    showMessage(data.message, 'success');
+                    loadIndicators();
+                    loadSummaryData();
+                    loadDataTable();
+                    updateVisualization();
+                })
+                .catch(error => {
+                    console.error('刷新数据失败:', error);
+                    showMessage('数据刷新失败: ' + error.message, 'danger');
+                })
+                .finally(() => {
+                    // 恢复按钮状态
+                    setTimeout(() => {
+                        refreshBtn.innerHTML = originalText;
+                        refreshBtn.disabled = false;
+                    }, 1000);
+                });
+        }
+    </script>
+</body>
+</html>
