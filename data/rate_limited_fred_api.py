@@ -16,12 +16,17 @@ class RateLimitedFredAPI:
     Enhanced FRED API client with rate limiting functionality
     """
     
-    def __init__(self, requests_per_minute: int = 60):
+    def __init__(
+        self,
+        requests_per_minute: int = 60,
+        default_start_date: str = "2010-01-01",
+    ):
         """
         Initialize the FRED API client with rate limiting
         
         Args:
             requests_per_minute: Maximum number of requests per minute (default: 60)
+            default_start_date: Default observation start date when none is provided
         """
         self.api_key = os.getenv("FRED_API_KEY")
         if not self.api_key:
@@ -33,9 +38,8 @@ class RateLimitedFredAPI:
         self.requests_per_minute = requests_per_minute
         self.request_times = []  # Track request timestamps
         
-        # Default date range (2018 to latest)
-        self.default_start_date = "2018-01-01"
-        self.default_end_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        # Default date range (configurable start to latest)
+        self.default_start_date = default_start_date
     
     def _check_rate_limit(self):
         """
@@ -82,7 +86,7 @@ class RateLimitedFredAPI:
         if not observation_start:
             observation_start = self.default_start_date
         if not observation_end:
-            observation_end = self.default_end_date
+            observation_end = self._current_default_end_date()
             
         url = f"{self.base_url}/series/observations"
         
@@ -213,6 +217,10 @@ class RateLimitedFredAPI:
                 results[series_id] = None
         
         return results
+
+    @staticmethod
+    def _current_default_end_date() -> str:
+        return (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
 
 # Example usage:
 # fred = RateLimitedFredAPI(requests_per_minute=30)  # Limit to 30 requests per minute

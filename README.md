@@ -8,11 +8,13 @@
 FOMC/
 ├── config/                 # 配置文件
 ├── data/                   # 数据处理相关模块
-│   ├── collect_economic_data_from_excel.py  # 从Excel文件收集经济数据
-│   ├── fred_api.py         # FRED API接口
-│   ├── preprocessing.py    # 数据预处理
-│   ├── rate_limited_fred_api.py  # 限速FRED API接口
-│   └── visualization.py    # 数据可视化
+│   ├── collect_economic_data_from_excel.py  # 读取Excel指标层级并一次性写库
+│   ├── data_updater.py     # 增量数据更新和任务编排入口
+│   ├── category_manager.py # 指标分类与排序维护
+│   ├── fred_api.py         # 简洁FRED API封装，供单次批量脚本调用
+│   ├── preprocessing.py    # 数据清洗、单位标准化等预处理工具
+│   ├── rate_limited_fred_api.py  # 带限速与批处理辅助的FRED API客户端
+│   └── visualization.py    # 本地探索式可视化
 ├── database/               # 数据库相关模块
 │   ├── base.py            # 共享Base对象
 │   ├── connection.py      # 数据库连接
@@ -28,10 +30,31 @@ FOMC/
 ├── fomc_data.db           # SQLite数据库文件
 ├── init_database.py       # 数据库初始化脚本
 ├── process_all_indicators.py  # 批量处理所有经济指标
-├── requirements.txt       # Python依赖包
-├── setup_categories.py    # 设置经济指标分类
-└── update_database.py     # 更新数据库脚本
+└── requirements.txt       # Python依赖包
 ```
+
+## 核心Python模块功能一览
+
+| 模块 | 作用 | 典型入口 |
+| --- | --- | --- |
+| `data/collect_economic_data_from_excel.py` | 解析 `docs/US Economic Indicators...xlsx`，创建分类层级并全量抓取指标后写入数据库。适合冷启动或重建数据库。 | `python data/collect_economic_data_from_excel.py --excel docs/...xlsx` |
+| `data/data_updater.py` | 高级增量更新器，循环请求指标、调用预处理逻辑并把新数据落库；整合限速 API、分类工具及数据库层。 | `python data/data_updater.py --days-back 365` |
+| `data/fred_api.py` | 最基础的FRED API封装（无限速、无默认日期），提供 `get_series / get_series_info / search_series` 等方法，便于单脚本快速调用。 | 被 `collect_economic_data_from_excel.py` 引用 |
+| `data/rate_limited_fred_api.py` | 在基础API之上增加速率限制、默认日期区间、批量抓取（`get_multiple_series`）与日志，保证长任务稳定。 | 被 `data_updater.py`、`process_all_indicators.py` 等增量任务引用 |
+| `data/preprocessing.py` | `DataPreprocessor` 类：负责对下载的原始序列做去重、频率对齐、单位映射及插值等标准化处理。 | 在 `data_updater.py`、`collect_economic_data_from_excel.py` 中实例化 |
+| `data/category_manager.py` | 维护指标分类、排序、父子关系的工具，确保数据库与Excel结构一致。 | `process_all_indicators.py` |
+| `database/*.py` | SQLAlchemy 基础设施：`base.py` 提供 Base，`models.py` 定义 3 张核心表，`connection.py` 提供 `get_db` 和 engine。 | 所有写库脚本 |
+| `process_all_indicators.py` | 一键运行全流程：同步分类、抓取指标、执行预处理、写库，可通过参数选择起始日期和是否全量刷新。 | `python process_all_indicators.py --start-date 2015-01-01` |
+| `webapp/app.py` | Flask Web 界面，展示数据库中的指标、曲线和表格。 | `python webapp/app.py` |
+
+### 关于 FRED API 模块是否重复？
+
+项目中保留了两个FRED客户端，它们面向不同场景，并非简单重复：
+
+- `fred_api.py`：轻量封装，便于在一次性脚本或Notebook中快速调用 FRED 接口，不包含限速或批量逻辑。当前 `collect_economic_data_from_excel.py` 依赖该实现，以保持脚本流程直观。
+- `rate_limited_fred_api.py`：具备调用频控、默认日期回填、批量抓取辅助等稳态运行所需特性，是 `data_updater.py`、`process_all_indicators.py` 等长时间运行脚本的默认客户端。
+
+因此 `fred_api.py` 仍有保留价值；如果未来所有脚本都迁移到带限速版本，可以再考虑统一接口后删除。
 
 ## 安装依赖
 ```bash
@@ -52,22 +75,17 @@ FRED_API_KEY=your_api_key_here
 python init_database.py
 ```
 
-### 2. 设置经济指标分类
+### 2. 批量处理所有经济指标（推荐）
+`process_all_indicators.py` 现在同时负责维护指标层级、排序和数据更新，可使用参数控制抓取范围：
 ```bash
-python setup_categories.py
-```
-
-### 3. 批量处理所有经济指标（推荐）
-```bash
+# 拉取默认（2010至最新）数据
 python process_all_indicators.py
+
+# 指定历史区间或全量重建示例
+python process_all_indicators.py --start-date 2010-01-01 --full-refresh
 ```
 
-### 4. 更新数据库
-```bash
-python update_database.py
-```
-
-### 5. 启动Web数据浏览器
+### 3. 启动Web数据浏览器
 ```bash
 cd webapp
 python app.py

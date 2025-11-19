@@ -1,6 +1,6 @@
 # Database models for FOMC project
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from .base import Base
 
@@ -60,6 +60,9 @@ class EconomicDataPoint(Base):
     Model for individual data points of economic indicators
     """
     __tablename__ = 'economic_data_points'
+    __table_args__ = (
+        UniqueConstraint('indicator_id', 'date', name='uq_indicator_date'),
+    )
     
     id = Column(Integer, primary_key=True)
     indicator_id = Column(Integer, ForeignKey('economic_indicators.id'), nullable=False)  # Foreign key to EconomicIndicator
