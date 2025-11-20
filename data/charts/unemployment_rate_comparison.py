@@ -146,7 +146,7 @@ class UnemploymentRateComparisonBuilder:
         ax.set_xticks(list(x))
         ax.set_xticklabels(labels)
         ax.set_ylabel("失业率(%)")
-        ax.set_title("图2：美国各类型失业率(%)", loc="left", pad=12)
+        ax.set_title("图3：各类型失业率(%)", loc="left", pad=12)
         ax.legend(loc="upper left", bbox_to_anchor=(0, 1.02), ncol=2, frameon=False)
         ax.grid(axis="y", alpha=0.2)
 

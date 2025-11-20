@@ -26,6 +26,7 @@ from database.models import EconomicIndicator, EconomicDataPoint, IndicatorCateg
 from sqlalchemy import func
 
 from data.charts.nonfarm_jobs_chart import LaborMarketChartBuilder
+from data.charts.industry_job_contributions import IndustryContributionChartBuilder
 from data.charts.unemployment_rate_comparison import UnemploymentRateComparisonBuilder
 from reports.report_generator import EconomicReportGenerator, IndicatorSummary, ReportFocus
 
@@ -47,6 +48,13 @@ def get_unemployment_chart_builder():
     if not hasattr(app, "_unemployment_chart_builder"):
         app._unemployment_chart_builder = UnemploymentRateComparisonBuilder(database_url=DATABASE_URL)
     return app._unemployment_chart_builder
+
+
+def get_industry_contribution_builder():
+    """Singleton accessor for industry contribution ratios."""
+    if not hasattr(app, "_industry_contribution_builder"):
+        app._industry_contribution_builder = IndustryContributionChartBuilder(database_url=DATABASE_URL)
+    return app._industry_contribution_builder
 
 def build_economic_report():
     """Lazy init the EconomicReportGenerator, only when API key is configured."""
@@ -294,6 +302,20 @@ def generate_labor_market_report():
             })
     except Exception as exc:
         rate_series_summary = []
+    
+    industry_contribution = {}
+    try:
+        industry_builder = get_industry_contribution_builder()
+        contrib_payload = industry_builder.prepare_payload(as_of=parsed_month)
+        industry_contribution = {
+            'labels': contrib_payload.labels,
+            'datasets': contrib_payload.datasets,
+            'latest_period': contrib_payload.latest_period,
+            'top_positive': contrib_payload.top_positive,
+            'top_negative': contrib_payload.top_negative
+        }
+    except Exception as exc:
+        industry_contribution = {'error': f'分行业贡献数据缺失: {exc}'}
 
     payems_row = select_month_row(chart_payload.payems_changes, target_period)
     unemployment_row = select_month_row(chart_payload.unemployment_rate, target_period)
@@ -457,20 +479,46 @@ def generate_labor_market_report():
 
     avg_payems = chart_payload.payems_changes["monthly_change_10k"].mean()
     avg_unemp = chart_payload.unemployment_rate["value"].mean()
-    chart_commentary = (
-        f"图表覆盖{chart_payload.start_date:%Y-%m}至{chart_payload.end_date:%Y-%m}。"
-        f"期间新增非农就业平均{avg_payems:.1f}万人，"
-        f"当前为{payems_value:.1f}万人；失业率平均{avg_unemp:.1f}%，"
-        f"当前为{unemp_value:.1f}%."
-    ) if payems_value is not None and unemp_value is not None else ""
+    chart_commentary_parts = []
+    if payems_value is not None and unemp_value is not None:
+        chart_commentary_parts.append(
+            f"图表覆盖{chart_payload.start_date:%Y-%m}至{chart_payload.end_date:%Y-%m}。"
+            f"期间新增非农就业平均{avg_payems:.1f}万人，当前为{payems_value:.1f}万人；"
+            f"失业率平均{avg_unemp:.1f}%，当前为{unemp_value:.1f}%."
+        )
 
     if employment_value is not None and participation_value is not None:
         emp_avg = employment_df["value"].mean()
         part_avg = participation_df["value"].mean()
-        chart_commentary += (
-            f" 就业率均值约{emp_avg:.2f}%，当前{employment_value:.2f}%；"
+        chart_commentary_parts.append(
+            f"就业率均值约{emp_avg:.2f}%，当前{employment_value:.2f}%；"
             f"劳动参与率均值约{part_avg:.2f}%，当前{participation_value:.2f}%。"
         )
+
+    industry_commentary = ""
+    if industry_contribution.get('labels') and not industry_contribution.get('error'):
+        labels_range = (industry_contribution['labels'][0], industry_contribution['labels'][-1])
+        latest_period = industry_contribution.get('latest_period')
+        pos_text = "，".join(
+            f"{item['label']} {item['value']:+.1f}%"
+            for item in (industry_contribution.get('top_positive') or [])
+        )
+        neg_text = "，".join(
+            f"{item['label']} {item['value']:+.1f}%"
+            for item in (industry_contribution.get('top_negative') or [])
+        )
+        pieces = []
+        if pos_text:
+            pieces.append(f"主要拉动：{pos_text}")
+        if neg_text:
+            pieces.append(f"拖累：{neg_text}")
+        industry_commentary = (
+            f"图2覆盖{labels_range[0]}至{labels_range[1]}。"
+            f"{latest_period or ''}月分行业贡献率显示，" + ("；".join(pieces) if pieces else "贡献结构缺乏显著差异。")
+        )
+        chart_commentary_parts.append(industry_commentary)
+
+    chart_commentary = " ".join(part for part in chart_commentary_parts if part)
 
     fomc_points = []
     if payems_value is not None and avg_payems is not None:
@@ -527,6 +575,7 @@ def generate_labor_market_report():
         'unemployment_series': serialize_series(chart_payload.unemployment_rate, "value"),
         'unemployment_types_series': rate_series_summary,
         'employment_participation_series': employment_participation_series,
+        'industry_contribution': industry_contribution,
         'report_text': report_text,
         'llm_error': llm_error
     }

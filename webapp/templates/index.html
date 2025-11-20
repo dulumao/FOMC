@@ -639,12 +639,16 @@
                                                 <canvas id="reportChart1" height="320"></canvas>
                                             </figure>
                                             <figure class="report-figure">
-                                                <div class="figure-title">图2：美国各类型失业率(%)</div>
-                                                <canvas id="reportChart2" height="320"></canvas>
+                                                <div class="figure-title">图2：分行业新增非农就业贡献率(%)</div>
+                                                <canvas id="reportChart2" height="360"></canvas>
                                             </figure>
                                             <figure class="report-figure">
-                                                <div class="figure-title">图3：美国就业率与劳动参与率(%)</div>
+                                                <div class="figure-title">图3：各类型失业率(%)</div>
                                                 <canvas id="reportChart3" height="320"></canvas>
+                                            </figure>
+                                            <figure class="report-figure">
+                                                <div class="figure-title">图4：就业率和劳动参与率(%)</div>
+                                                <canvas id="reportChart4" height="320"></canvas>
                                             </figure>
                                             <div id="llmError" class="text-danger small mt-2 d-none"></div>
                                         </div>
@@ -1304,6 +1308,7 @@
         let reportChart1 = null;
         let reportChart2 = null;
         let reportChart3 = null;
+        let reportChart4 = null;
 
         function destroyReportCharts() {
             if (reportChart1) {
@@ -1317,6 +1322,10 @@
             if (reportChart3) {
                 reportChart3.destroy();
                 reportChart3 = null;
+            }
+            if (reportChart4) {
+                reportChart4.destroy();
+                reportChart4 = null;
             }
         }
 
@@ -1350,16 +1359,20 @@
             const fig1 = document.getElementById('reportChart1')?.closest('figure') || null;
             const fig2 = document.getElementById('reportChart2')?.closest('figure') || null;
             const fig3 = document.getElementById('reportChart3')?.closest('figure') || null;
+            const fig4 = document.getElementById('reportChart4')?.closest('figure') || null;
             const hasFig1 = !!(fig1 && fig1.parentNode);
             const hasFig2 = !!(fig2 && fig2.parentNode);
             const hasFig3 = !!(fig3 && fig3.parentNode);
+            const hasFig4 = !!(fig4 && fig4.parentNode);
             if (hasFig1) fig1.parentNode.removeChild(fig1);
             if (hasFig2) fig2.parentNode.removeChild(fig2);
             if (hasFig3) fig3.parentNode.removeChild(fig3);
+            if (hasFig4) fig4.parentNode.removeChild(fig4);
 
             let placed1 = false;
             let placed2 = false;
             let placed3 = false;
+            let placed4 = false;
 
             Array.from(contentWrapper.childNodes).forEach(node => {
                 container.appendChild(node);
@@ -1375,11 +1388,16 @@
                     container.appendChild(fig3);
                     placed3 = true;
                 }
+                if (!placed4 && fig4 && node.nodeType === 1 && /图4/.test(node.textContent || '')) {
+                    container.appendChild(fig4);
+                    placed4 = true;
+                }
             });
 
             if (fig1 && !placed1) container.appendChild(fig1);
             if (fig2 && !placed2) container.appendChild(fig2);
             if (fig3 && !placed3) container.appendChild(fig3);
+            if (fig4 && !placed4) container.appendChild(fig4);
 
             renderReportCharts(rawData);
         }
@@ -1390,6 +1408,7 @@
             const canvas1 = resetReportCanvas('reportChart1');
             const canvas2 = resetReportCanvas('reportChart2');
             const canvas3 = resetReportCanvas('reportChart3');
+            const canvas4 = resetReportCanvas('reportChart4');
 
             if (canvas1) {
                 const labels = (data.payems_series || []).map(p => p.date);
@@ -1436,10 +1455,73 @@
             }
 
             if (canvas2) {
+                const contribution = data.industry_contribution || {};
+                const labels = contribution.labels || [];
+                const datasetsRaw = contribution.datasets || [];
+                const hasData = Array.isArray(labels) && labels.length > 0 && Array.isArray(datasetsRaw) && datasetsRaw.length > 0;
+                if (!hasData) {
+                    const parent = canvas2.parentNode;
+                    if (parent && !parent.querySelector('.figure-empty')) {
+                        const holder = document.createElement('div');
+                        holder.className = 'text-muted small figure-empty';
+                        holder.textContent = contribution.error || '缺少分行业贡献率数据';
+                        parent.appendChild(holder);
+                    }
+                } else {
+                    const empty = canvas2.parentNode?.querySelector('.figure-empty');
+                    if (empty) empty.remove();
+
+                    const palette = [
+                        '#1f77b4', '#52b788', '#f4a261', '#e63946', '#2a9d8f', '#6c63ff', '#ff7f50',
+                        '#90be6d', '#d35d6e', '#5c7cfa', '#00b4d8', '#b07dac', '#7d8597', '#2c3e50'
+                    ];
+                    const reversedLabels = [...labels].reverse();
+                    const datasets = datasetsRaw.map((d, idx) => ({
+                        label: d.label,
+                        data: [...(d.data || [])].reverse(),
+                        backgroundColor: palette[idx % palette.length],
+                        borderWidth: 0,
+                        stack: 'total'
+                    }));
+
+                    reportChart2 = new Chart(canvas2.getContext('2d'), {
+                        type: 'bar',
+                        data: { labels: reversedLabels, datasets },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'top', align: 'start', labels: { boxWidth: 14, boxHeight: 14 } },
+                                tooltip: {
+                                    callbacks: {
+                                        label: (ctx) => {
+                                            const val = ctx.raw;
+                                            const formatted = val === null || val === undefined ? '—' : `${val.toFixed(2)}%`;
+                                            const code = datasetsRaw[ctx.datasetIndex]?.code || '';
+                                            return `${ctx.dataset.label} (${code}): ${formatted}`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    stacked: true,
+                                    title: { display: true, text: '贡献率 (%)' },
+                                    ticks: { callback: (value) => `${value}%` }
+                                },
+                                y: { stacked: true }
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (canvas3) {
                 const labels = (data.unemployment_types_series || []).map(i => i.label);
                 const prevValues = (data.unemployment_types_series || []).map(i => i.previous ?? null);
                 const currValues = (data.unemployment_types_series || []).map(i => i.current ?? null);
-                reportChart2 = new Chart(canvas2.getContext('2d'), {
+                reportChart3 = new Chart(canvas3.getContext('2d'), {
                     type: 'bar',
                     data: {
                         labels,
@@ -1457,13 +1539,13 @@
                 });
             }
 
-            if (canvas3) {
+            if (canvas4) {
                 const labels = (data.employment_participation_series || []).map(p => p.date);
                 const employmentValues = (data.employment_participation_series || []).map(p => p.employment_rate != null ? Number(p.employment_rate) : null);
                 const participationValues = (data.employment_participation_series || []).map(p => p.participation_rate != null ? Number(p.participation_rate) : null);
                 const hasSeries = employmentValues.some(v => v !== null) || participationValues.some(v => v !== null);
                 if (!hasSeries) {
-                    const parent = canvas3.parentNode;
+                    const parent = canvas4.parentNode;
                     if (parent && !parent.querySelector('.figure-empty')) {
                         const holder = document.createElement('div');
                         holder.className = 'text-muted small figure-empty';
@@ -1472,10 +1554,10 @@
                     }
                     return;
                 } else {
-                    const empty = canvas3.parentNode?.querySelector('.figure-empty');
+                    const empty = canvas4.parentNode?.querySelector('.figure-empty');
                     if (empty) empty.remove();
                 }
-                reportChart3 = new Chart(canvas3.getContext('2d'), {
+                reportChart4 = new Chart(canvas4.getContext('2d'), {
                     type: 'line',
                     data: {
                         labels,

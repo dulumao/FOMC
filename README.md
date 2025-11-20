@@ -7,9 +7,10 @@
 ```
 ├─ config/                         # 全局配置占位（保持包结构）
 ├─ data/                           # 数据摄取与预处理
-│   ├─ charts/                     # 生成静态图的数据管道
-│   │   ├─ nonfarm_jobs_chart.py   # PAYEMS + UNRATE 组合图（图1数据来源）
-│   │   └─ unemployment_rate_comparison.py  # U1~U6 对比（图2数据来源）
+│   ├─ charts/                     # 研报/前端用的静态图数据管道
+│   │   ├─ nonfarm_jobs_chart.py              # PAYEMS + UNRATE 组合图（图1）
+│   │   ├─ industry_job_contributions.py      # 分行业就业贡献率（图2）
+│   │   └─ unemployment_rate_comparison.py    # U1~U6 对比（图3）
 │   ├─ collect_economic_data_from_excel.py  # 读取 Excel 指标层级并写库
 │   ├─ data_updater.py             # 增量更新调度
 │   ├─ category_manager.py         # 指标分类/排序维护
@@ -25,7 +26,7 @@
 │   ├─ US Economic Indicators with FRED Codes.xlsx
 │   └─ cpi_weights.csv
 ├─ reports/                        # 研报生成
-│   ├─ report_generator.py         # 构造Prompt + 调用DeepSeek
+│   ├─ report_generator.py         # 构造Prompt + 调用DeepSeek（含图1~图4提示词）
 │   └─ deepseek_client.py          # DeepSeek API封装
 ├─ webapp/                         # Flask 前端
 │   ├─ app.py                      # API + 前端路由
@@ -51,6 +52,14 @@
 | `database/*.py` | SQLAlchemy 基础设施：`base.py` 提供 Base，`models.py` 定义 3 张核心表，`connection.py` 提供 `get_db` 和 engine。 | 所有写库脚本 |
 | `process_all_indicators.py` | 一键运行全流程：同步分类、抓取指标、执行预处理、写库，可通过参数选择起始日期和是否全量刷新。 | `python process_all_indicators.py --start-date 2015-01-01` |
 | `webapp/app.py` | Flask Web 界面，展示数据库中的指标、曲线和表格。 | `python webapp/app.py` |
+
+### 图表与研报文件速查
+- `data/charts/nonfarm_jobs_chart.py`：图1数据管道，生成新增非农就业+失业率组合。
+- `data/charts/industry_job_contributions.py`：图2数据管道，计算分行业就业对总新增的贡献率（含正负值）。
+- `data/charts/unemployment_rate_comparison.py`：图3数据管道，对比U1~U6失业率。
+- `webapp/app.py`：提供API `/api/labor-market/report`，汇总图1~图4的数据，并调用 DeepSeek 生成研报文本。
+- `webapp/templates/index.html`：前端单页，渲染研报与所有图表（图1~图4）。
+- `reports/report_generator.py`：LLM 提示词与研报样式定义；可调整输出段落与口径。
 
 ### 关于 FRED API 模块是否重复？
 
