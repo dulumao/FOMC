@@ -323,6 +323,75 @@
             box-shadow: 0 0.5rem 1rem rgba(13, 110, 253, 0.15);
         }
 
+        .report-sidebar {
+            gap: 0.6rem;
+        }
+
+        .report-nav .list-group-item {
+            border: none;
+            padding: 0.6rem 0.75rem;
+        }
+
+        .report-nav .list-group-item:hover {
+            background: #f4f6fa;
+        }
+
+        .report-figure,
+        .report-article,
+        #indicatorSummaryBlock {
+            scroll-margin-top: 80px;
+        }
+
+        .indicator-summary-card .card-body {
+            padding: 0.75rem 0.9rem;
+        }
+
+        .summary-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+        }
+
+        .summary-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 0.55rem 0.75rem;
+            background: linear-gradient(160deg, #ffffff, #f6f8fb);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.025);
+        }
+
+        .summary-title {
+            font-weight: 650;
+            color: #1f2937;
+            font-size: 0.9rem;
+        }
+
+        .summary-value {
+            font-size: 1rem;
+            color: #0f172a;
+        }
+
+        .summary-meta {
+            color: #6b7280;
+            font-size: 0.8rem;
+        }
+
+        .summary-link {
+            font-size: 0.78rem;
+        }
+
+        .nav-label {
+            display: block;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .nav-sub {
+            display: block;
+            color: #6b7280;
+            font-size: 0.82rem;
+        }
+
         .report-tabs .nav-link {
             font-weight: 600;
         }
@@ -361,6 +430,16 @@
             /* 在小屏幕上改为垂直布局 */
             .sidebar-col {
                 margin-bottom: 1.5rem;
+            }
+        }
+
+        @media (min-width: 992px) {
+            .report-sidebar {
+                position: sticky;
+                top: 88px;
+                max-height: calc(100vh - 96px);
+                overflow-y: auto;
+                padding-right: 0.15rem;
             }
         }
         
@@ -597,35 +676,56 @@
                 <div class="tab-content pt-3" id="reportTabContent">
                     <div class="tab-pane fade show active" id="nonfarmReport" role="tabpanel" aria-labelledby="nonfarm-tab">
                         <div class="row g-4">
-                            <div class="col-lg-4">
-                                <div class="card h-100">
-                                    <div class="card-header bg-dark text-white">
-                                        <h5 class="mb-1"><i class="bi bi-clipboard2-pulse"></i> 非农就业形势研判</h5>
-                                        <small class="text-white-50">选择月份后，系统会绘制图表并生成文字分析</small>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="mb-3">
-                                            <label for="reportMonth" class="form-label">报告月份</label>
-                                            <input type="month" class="form-control" id="reportMonth">
+                            <div class="col-12 col-lg-4 col-xl-3">
+                                <div class="report-sidebar d-flex flex-column">
+                                    <div class="card">
+                                        <div class="card-header bg-dark text-white">
+                                            <h5 class="mb-1"><i class="bi bi-clipboard2-pulse"></i> 非农就业形势研判</h5>
+                                            <small class="text-white-50">选择月份后，系统会绘制图表并生成文字分析</small>
                                         </div>
-                                        <div class="d-flex flex-column gap-2">
-                                            <div class="d-flex flex-column flex-md-row gap-2">
-                                                <button class="btn btn-dark flex-grow-1" id="generateReportBtn">
-                                                    <i class="bi bi-play-circle"></i> 生成图表与研报
-                                                </button>
-                                                <button class="btn btn-outline-primary flex-grow-1" id="exportPdfBtn" disabled>
-                                                    <i class="bi bi-file-earmark-pdf"></i> 导出PDF
-                                                </button>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label for="reportMonth" class="form-label">报告月份</label>
+                                                <input type="month" class="form-control" id="reportMonth">
                                             </div>
-                                            <div id="reportStatus" class="report-meta text-md-end">请选择月份后点击生成。</div>
+                                            <div class="d-flex flex-column gap-2">
+                                                <div class="d-flex flex-column flex-md-row gap-2">
+                                                    <button class="btn btn-dark flex-grow-1" id="generateReportBtn">
+                                                        <i class="bi bi-play-circle"></i> 生成图表与研报
+                                                    </button>
+                                                    <button class="btn btn-outline-primary flex-grow-1" id="exportPdfBtn" disabled>
+                                                        <i class="bi bi-file-earmark-pdf"></i> 导出PDF
+                                                    </button>
+                                                </div>
+                                                <div id="reportStatus" class="report-meta text-md-end">请选择月份后点击生成。</div>
+                                            </div>
+                                            <div class="mt-3 small text-muted">
+                                                输出内容聚焦美联储关注的就业增速、失业率结构与劳动力参与率。
+                                            </div>
                                         </div>
-                                        <div class="mt-3 small text-muted">
-                                            输出内容聚焦美联储关注的就业增速、失业率结构与劳动力参与率。
+                                    </div>
+                                    <div class="card report-nav">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0"><i class="bi bi-map"></i> 研报导航</h6>
+                                        </div>
+                                        <div class="list-group list-group-flush" id="reportNavList">
+                                            <div class="list-group-item text-muted small">生成研报后显示章节</div>
+                                        </div>
+                                    </div>
+                                    <div class="card indicator-summary-card" id="indicatorSummaryBlock">
+                                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0"><i class="bi bi-stars"></i> 关键经济指标</h6>
+                                            <span class="text-muted small">最新</span>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="indicatorSummary" class="summary-list">
+                                                <div class="text-muted small">暂无数据，请先生成一次研报。</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-lg-8">
+                            <div class="col-12 col-lg-8 col-xl-9">
                                 <div class="card h-100">
                                     <div class="card-body">
                                         <div class="report-article" id="reportArticle">
@@ -639,29 +739,23 @@
                                             <div class="report-body" id="reportText">
                                                 <p class="text-muted">生成研报后，将呈现图文并茂的结构化解读。</p>
                                             </div>
-                                            <figure class="report-figure mt-3">
+                                            <figure class="report-figure mt-3" id="figure1">
                                                 <div class="figure-title">图1：新增非农就业（万人）及失业率(%，右)</div>
                                                 <canvas id="reportChart1" height="320"></canvas>
                                             </figure>
-                                            <figure class="report-figure">
+                                            <figure class="report-figure" id="figure2">
                                                 <div class="figure-title">图2：分行业新增非农就业贡献率(%)</div>
                                                 <canvas id="reportChart2" height="360"></canvas>
                                             </figure>
-                                            <figure class="report-figure">
+                                            <figure class="report-figure" id="figure3">
                                                 <div class="figure-title">图3：各类型失业率(%)</div>
                                                 <canvas id="reportChart3" height="320"></canvas>
                                             </figure>
-                                            <figure class="report-figure">
+                                            <figure class="report-figure" id="figure4">
                                                 <div class="figure-title">图4：就业率和劳动参与率(%)</div>
                                                 <canvas id="reportChart4" height="320"></canvas>
                                             </figure>
                                             <div id="llmError" class="text-danger small mt-2 d-none"></div>
-                                        </div>
-                                        <div class="mt-4">
-                                            <h6>关键指标摘要</h6>
-                                            <div id="indicatorSummary" class="row g-2">
-                                                <div class="col-12 text-muted">暂无数据，请先生成一次研报。</div>
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1416,6 +1510,7 @@
                 p.className = 'text-muted';
                 p.textContent = '未能生成研报内容，请检查DeepSeek配置。';
                 container.appendChild(p);
+                updateReportNav([]);
                 return;
             }
 
@@ -1475,6 +1570,17 @@
             placeFigureAfterText(fig4, '图4');
 
             renderReportCharts(rawData);
+
+            // 生成导航：提取 h1/h2/h3
+            const headings = Array.from(container.querySelectorAll('h1, h2, h3')).map((el, idx) => {
+                // 确保有 id
+                if (!el.id) {
+                    const slug = `section-${idx}-${el.textContent.trim().replace(/\s+/g, '-').toLowerCase()}`;
+                    el.id = slug;
+                }
+                return { id: el.id, text: el.textContent.trim(), level: el.tagName.toLowerCase() };
+            });
+            updateReportNav(headings);
         }
 
         function renderReportCharts(data) {
@@ -1689,17 +1795,27 @@
             if (!wrapper) return;
             wrapper.innerHTML = '';
 
+            const fredCodeMap = {
+                '新增非农就业': 'PAYEMS',
+                '失业率(U3)': 'UNRATE',
+                '就业率': 'LNS12300060',
+                '劳动参与率': 'CIVPART'
+            };
+
             const metricItems = [];
             if (indicators && Array.isArray(indicators)) {
                 indicators.forEach(item => {
                     const deltas = [];
                     if (item.mom_change) deltas.push(`环比 ${item.mom_change}`);
                     if (item.yoy_change) deltas.push(`同比 ${item.yoy_change}`);
+                    const latestValue = item.latest_value !== null && item.latest_value !== undefined ? item.latest_value : '—';
+                    const units = item.units || '';
                     metricItems.push({
                         title: item.name,
-                        value: `${item.latest_value}${item.units}`,
+                        value: `${latestValue}${units}`,
                         detail: deltas.join(' · '),
-                        context: item.context || ''
+                        context: item.context || '',
+                        code: item.code || fredCodeMap[item.name]
                     });
                 });
             }
@@ -1711,39 +1827,51 @@
                         title: `${item.label} 失业率`,
                         value: item.current !== null && item.current !== undefined ? `${item.current.toFixed(2)}%` : '—',
                         detail: delta ? `环比 ${delta}` : '',
-                        context: `代码 ${item.code}`
+                        context: '',
+                        code: item.code || fredCodeMap[item.label]
                     });
                 });
             }
 
             if (metricItems.length === 0) {
                 const placeholder = document.createElement('div');
-                placeholder.className = 'col-12 text-muted';
+                placeholder.className = 'text-muted small';
                 placeholder.textContent = '暂无数据，请先生成一次研报。';
                 wrapper.appendChild(placeholder);
                 return;
             }
 
             metricItems.forEach(item => {
-                const col = document.createElement('div');
-                col.className = 'col-sm-6 col-lg-4';
-                const pill = document.createElement('div');
-                pill.className = 'metric-pill';
-                pill.innerHTML = `<strong>${item.title}</strong><div>${item.value}</div>`;
-                if (item.detail) {
-                    const detailEl = document.createElement('div');
-                    detailEl.className = 'text-muted small';
-                    detailEl.textContent = item.detail;
-                    pill.appendChild(detailEl);
-                }
-                if (item.context) {
-                    const contextEl = document.createElement('div');
-                    contextEl.className = 'text-muted small';
-                    contextEl.textContent = item.context;
-                    pill.appendChild(contextEl);
-                }
-                col.appendChild(pill);
-                wrapper.appendChild(col);
+                const card = document.createElement('div');
+                card.className = 'summary-item';
+                const fredLink = item.code ? `<a class="summary-link text-primary" href="https://fred.stlouisfed.org/series/${item.code}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> FRED</a>` : '';
+                card.innerHTML = `
+                    <div class="summary-title">${item.title}</div>
+                    <div class="summary-value">${item.value}</div>
+                    ${item.detail ? `<div class="summary-meta">${item.detail}</div>` : ''}
+                    ${fredLink ? `<div>${fredLink}</div>` : ''}
+                `;
+                wrapper.appendChild(card);
+            });
+        }
+
+        function updateReportNav(headings) {
+            const navList = document.getElementById('reportNavList');
+            if (!navList) return;
+            navList.innerHTML = '';
+            if (!headings || headings.length === 0) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'list-group-item text-muted small';
+                placeholder.textContent = '生成研报后显示章节';
+                navList.appendChild(placeholder);
+                return;
+            }
+            headings.forEach(h => {
+                const item = document.createElement('a');
+                item.className = 'list-group-item list-group-item-action';
+                item.href = `#${h.id}`;
+                item.innerHTML = `<span class="nav-label">${h.text}</span>`;
+                navList.appendChild(item);
             });
         }
 

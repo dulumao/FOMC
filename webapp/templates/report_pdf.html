@@ -56,36 +56,6 @@
                 <p class="meta">未提供研报正文。</p>
             {% endif %}
         </div>
-
-        <div class="card">
-            <div class="badge badge-muted">关键指标摘要</div>
-            <div class="pill-grid" style="margin-top:10px;">
-                {% if report.indicators %}
-                    {% for item in report.indicators %}
-                        <div class="pill">
-                            <strong>{{ item.name }}</strong>
-                            <div>{{ item.latest_value }}{{ item.units }}</div>
-                            {% if item.mom_change %}<div class="meta">环比 {{ item.mom_change }}</div>{% endif %}
-                            {% if item.yoy_change %}<div class="meta">同比 {{ item.yoy_change }}</div>{% endif %}
-                            {% if item.context %}<div class="meta">{{ item.context }}</div>{% endif %}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-                {% if report.unemployment_types_series %}
-                    {% for item in report.unemployment_types_series %}
-                        <div class="pill">
-                            <strong>{{ item.label }} 失业率</strong>
-                            <div>{{ "%.2f"|format(item.current or 0) }}%</div>
-                            {% if item.mom_delta is not none %}<div class="meta">环比 {{ "%+.2f"|format(item.mom_delta) }}</div>{% endif %}
-                            {% if item.code %}<div class="meta">代码 {{ item.code }}</div>{% endif %}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-                {% if (not report.indicators) and (not report.unemployment_types_series) %}
-                    <div class="pill"><div class="meta">暂无摘要数据</div></div>
-                {% endif %}
-            </div>
-        </div>
     </div>
 </body>
 </html>

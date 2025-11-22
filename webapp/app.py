@@ -924,25 +924,45 @@ def export_labor_market_report_pdf():
         <div class="pdf-foot">第 <span class="pageNumber"></span> / <span class="totalPages"></span> 页</div>
         """
         with sync_playwright() as p:
-            browser = p.chromium.launch(args=["--no-sandbox"])
+            browser = p.chromium.launch(args=["--no-sandbox", "--export-tagged-pdf"])
             page = browser.new_page(viewport={"width": 1280, "height": 720})
             page.set_content(pdf_html, wait_until="load")
             try:
-                pdf_bytes = page.pdf(
-                    format="A4",
-                    print_background=True,
-                    display_header_footer=True,
-                    header_template=header_template,
-                    footer_template=footer_template,
-                    margin={"top": "20mm", "bottom": "22mm", "left": "16mm", "right": "16mm"}
-                )
+                # 优先使用 CDP 打印，开启 generateTaggedPDF 以便生成书签/大纲
+                session = page.context.new_cdp_session(page)
+                mm_to_inch = 0.0393701
+                result = session.send("Page.printToPDF", {
+                    "printBackground": True,
+                    "displayHeaderFooter": True,
+                    "headerTemplate": header_template,
+                    "footerTemplate": footer_template,
+                    "marginTop": 20 * mm_to_inch,
+                    "marginBottom": 22 * mm_to_inch,
+                    "marginLeft": 16 * mm_to_inch,
+                    "marginRight": 16 * mm_to_inch,
+                    "paperWidth": 8.27,   # A4 width in inches
+                    "paperHeight": 11.69, # A4 height in inches
+                    "generateTaggedPDF": True
+                })
+                pdf_bytes = base64.b64decode(result.get("data", b""))
             except Exception:
-                app.logger.exception("带页眉/页码导出失败，使用降级方案重试")
-                pdf_bytes = page.pdf(
-                    format="A4",
-                    print_background=True,
-                    margin={"top": "20mm", "bottom": "22mm", "left": "16mm", "right": "16mm"}
-                )
+                app.logger.exception("CDP 打印失败，使用 Playwright 内置 pdf 兜底（无书签）")
+                try:
+                    pdf_bytes = page.pdf(
+                        format="A4",
+                        print_background=True,
+                        display_header_footer=True,
+                        header_template=header_template,
+                        footer_template=footer_template,
+                        margin={"top": "20mm", "bottom": "22mm", "left": "16mm", "right": "16mm"}
+                    )
+                except Exception:
+                    app.logger.exception("带页眉/页码导出失败，使用降级方案重试")
+                    pdf_bytes = page.pdf(
+                        format="A4",
+                        print_background=True,
+                        margin={"top": "20mm", "bottom": "22mm", "left": "16mm", "right": "16mm"}
+                    )
             browser.close()
     except Exception as exc:
         app.logger.exception("生成PDF失败")
