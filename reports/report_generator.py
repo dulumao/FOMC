@@ -108,6 +108,86 @@ class EconomicReportGenerator:
 
         return self.client.generate(messages)
 
+    def generate_cpi_report(
+        self,
+        report_month: str,
+        headline_summary: str,
+        inflation_metrics: Sequence[IndicatorSummary],
+        contributions_text_yoy: str = "",
+        contributions_text_mom: str = "",
+        chart_commentary: Optional[str] = None,
+        tone: str = "强调数据定量支撑，客观描述驱动项与FOMC关切。",
+    ) -> str:
+        """Generate CPI-themed narrative."""
+
+        prompt = self._build_cpi_prompt(
+            report_month=report_month,
+            headline_summary=headline_summary,
+            inflation_metrics=inflation_metrics,
+            contributions_text_yoy=contributions_text_yoy,
+            contributions_text_mom=contributions_text_mom,
+            chart_commentary=chart_commentary,
+            tone=tone,
+        )
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "你是美联储研究部门的通胀分析师。只使用输入中提供的数据，不得编造或猜测缺失的数值、分项或权重。"
+                    "若某分项数据缺失，请明确指出“数据未提供”，不要自行补全。"
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ]
+        return self.client.generate(messages)
+
+    def _build_cpi_prompt(
+        self,
+        report_month: str,
+        headline_summary: str,
+        inflation_metrics: Sequence[IndicatorSummary],
+        contributions_text_yoy: str,
+        contributions_text_mom: str,
+        chart_commentary: Optional[str],
+        tone: str,
+    ) -> str:
+        metrics_block = "\n".join(metric.as_prompt_line() for metric in inflation_metrics)
+        table_guidance = (
+            "表格分析要求：不得输出Markdown表格，仅用1-2段文字解读已提供的拉动列表。"
+            "同比表需指出本月/上月权重、主要拉动/拖累项及变化方向；"
+            "环比表需突出季调后的价格波动与当月拉动变化。"
+        )
+        logic_hints = (
+            "写作逻辑参考券商CPI点评：先给结论，再拆驱动，再谈粘性与展望。"
+            "注意住房服务、能源、食品分项的方向与权重，指出核心服务/核心商品对总 CPI 的拉动或缓和。"
+        )
+        sections = [
+            f"报告月份: {report_month}",
+            f"核心结论: {headline_summary}",
+            "关键通胀指标:",
+            metrics_block,
+            "同比拉动拆分:",
+            contributions_text_yoy or "未提供同比拆分。",
+            "季调环比拆分:",
+            contributions_text_mom or "未提供环比拆分。",
+            f"图表摘要:\n{chart_commentary}\n" if chart_commentary else "",
+            table_guidance,
+            logic_hints,
+            f"写作语气: {tone}",
+            (
+                "输出要求：Markdown。章节标题需以“图N｜/表N｜”开头方便定位，小标题内容仅写本节结论，无需再附“定位”文字。顺序："
+                "\n## 核心结论（3-5条，覆盖CPI与核心同比/环比、主要拉动力量及变化）；"
+                "\n## 图1｜自拟简短结论（内容聚焦：CPI与核心CPI同比；结合最近三年走势与当前值，不要猜测缺失月份）；"
+                "\n## 图2｜自拟简短结论（内容聚焦：CPI与核心CPI季调环比；强调当前方向及与上月对比）；"
+                "\n## 表1｜自拟简短结论（内容聚焦：CPI同比拉动拆分；先用文字解读提供的拉动列表，点出上月与本月的差异，禁止输出Markdown表格）；"
+                "\n## 表2｜自拟简短结论（内容聚焦：季调环比拆分；先用文字解读环比拉动列表，禁止输出Markdown表格）；"
+                "\n## 风险提示（2-3条，围绕能源波动、住房服务粘性等常识风险，但不要虚构数值）。"
+                "严禁编造市场表现或未提供的数据。"
+            ),
+        ]
+        return "\n".join(s for s in sections if s).strip()
+
     def _build_nonfarm_prompt(
         self,
         report_month: str,

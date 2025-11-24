@@ -9,11 +9,16 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #3498db;
-            --accent-color: #e74c3c;
-            --light-bg: #f8f9fa;
-            --dark-bg: #343a40;
+            --neutral-900: #0f172a;
+            --neutral-800: #1f2937;
+            --neutral-700: #334155;
+            --blue-700: #1f2c3d;   /* 非农主色 */
+            --blue-500: #2b63d9;
+            --orange-700: #b45309; /* CPI 主色 */
+            --orange-500: #f97316;
+            --teal-600: #0f766e;   /* 数据浏览色调 */
+            --light-bg: #f6f7fb;
+            --card-bg: #ffffff;
             --card-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
             --card-border: 1px solid rgba(0, 0, 0, 0.125);
         }
@@ -24,7 +29,7 @@
         }
         
         .header {
-            background: linear-gradient(135deg, var(--primary-color), #1a2530);
+            background: linear-gradient(135deg, var(--neutral-900), var(--neutral-700));
             color: white;
             padding: 1.5rem 0;
             margin-bottom: 2rem;
@@ -34,6 +39,21 @@
         .header h1 {
             font-weight: 600;
             letter-spacing: 0.5px;
+        }
+
+        .workspace-tabs .nav-link {
+            border: 1px solid transparent;
+            color: var(--teal-600);
+            font-weight: 600;
+        }
+        .workspace-tabs .nav-link.active {
+            background: var(--teal-600);
+            color: #fff;
+            border-color: var(--teal-600);
+        }
+        .workspace-tabs .nav-link:not(.active):hover {
+            border-color: var(--teal-600);
+            color: var(--teal-600);
         }
         
         .card {
@@ -54,7 +74,7 @@
         }
         
         .category-header {
-            background-color: var(--primary-color);
+            background: linear-gradient(135deg, var(--teal-600), #128c7e);
             color: white;
             padding: 0.4rem 0.6rem;
             border-radius: 0.375rem;
@@ -88,14 +108,14 @@
         }
         
         .indicator-item:hover {
-            background-color: #e9f7fe;
-            border-color: var(--secondary-color);
+            background-color: #e0f2fe;
+            border-color: var(--teal-600);
             transform: translateX(3px);
         }
         
         .indicator-item.active {
-            background-color: #d1ecf1;
-            border-color: #3498db;
+            background-color: #e0f2fe;
+            border-color: var(--teal-600);
         }
         
         .fred-link {
@@ -136,17 +156,48 @@
         
         .filter-section .form-label {
             font-weight: 500;
-            color: var(--primary-color);
+            color: var(--neutral-900);
         }
         
         .btn-primary {
-            background-color: var(--secondary-color);
-            border-color: var(--secondary-color);
+            background-color: var(--blue-500);
+            border-color: var(--blue-500);
         }
-        
+
         .btn-primary:hover {
-            background-color: #2980b9;
-            border-color: #2980b9;
+            background-color: #234ca7;
+            border-color: #234ca7;
+        }
+
+        .btn-nonfarm {
+            background: linear-gradient(135deg, var(--blue-700), var(--blue-500));
+            color: #fff;
+            border-color: var(--blue-700);
+        }
+        .btn-nonfarm:hover { color:#fff; opacity: 0.95; }
+        .btn-nonfarm-outline {
+            color: var(--blue-700);
+            border-color: var(--blue-500);
+            background: #fff;
+        }
+        .btn-nonfarm-outline:hover {
+            background: var(--blue-500);
+            color: #fff;
+        }
+        .btn-cpi {
+            background: linear-gradient(135deg, var(--orange-700), var(--orange-500));
+            color: #fff;
+            border-color: var(--orange-700);
+        }
+        .btn-cpi:hover { color:#fff; opacity: 0.95; }
+        .btn-cpi-outline {
+            color: var(--orange-700);
+            border-color: var(--orange-500);
+            background: #fff;
+        }
+        .btn-cpi-outline:hover {
+            background: var(--orange-500);
+            color: #fff;
         }
         
         .btn-light {
@@ -160,7 +211,7 @@
         }
         
         .table-dark {
-            background-color: var(--primary-color);
+            background-color: var(--neutral-900);
         }
 
         .report-chart-placeholder {
@@ -323,6 +374,16 @@
             box-shadow: 0 0.5rem 1rem rgba(13, 110, 253, 0.15);
         }
 
+        /* CPI tab idle color暖橙 */
+        #cpi-tab.nav-link {
+            color: #c2410c;
+        }
+        #cpi-tab.nav-link.active {
+            background: #f59e0b;
+            color: #fff;
+            box-shadow: 0 0.5rem 1rem rgba(245, 158, 11, 0.25);
+        }
+
         .report-sidebar {
             gap: 0.6rem;
         }
@@ -379,6 +440,108 @@
         .summary-link {
             font-size: 0.78rem;
         }
+
+        .contrib-table-wrapper {
+            margin-top: 0.75rem;
+        }
+
+        .contrib-table th, .contrib-table td {
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+
+        .contrib-table .major-row {
+            font-weight: 700;
+            background: #fff9e6;
+        }
+
+        .contrib-table .delta-pos {
+            color: #16a34a;
+        }
+
+        .contrib-table .delta-neg {
+            color: #dc2626;
+        }
+
+        .bar-cell {
+            width: clamp(72px, 18vw, 96px);
+        }
+
+        .bar-track {
+            height: 12px;
+            background: #f1f5f9;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            margin-top: 4px;
+            width: 100%;
+            max-width: 90px;
+        }
+
+        .bar-fill {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 0;
+            border-radius: 8px;
+        }
+
+        .bar-fill.pos {
+            background: linear-gradient(90deg, #fdba74, #f97316); /* 上升：橙色 */
+        }
+
+        .bar-fill.neg {
+            background: linear-gradient(90deg, #bae6fd, #0ea5e9); /* 下降：青蓝 */
+            right: 50%;
+        }
+
+        .tree-toggle {
+            border: none;
+            background: none;
+            color: #c2410c;
+            padding: 0 4px 0 0;
+            font-size: 0.9rem;
+            line-height: 1;
+        }
+
+        .tree-indent {
+            border-left: 1px dashed #e2e8f0;
+            padding-left: 8px;
+        }
+
+        .tree-leaf-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #cbd5e1;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        .heat-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+
+        .heat-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+        }
+
+        /* CPI 专区色彩统一（暖橙 + 海蓝） */
+        #cpiArticle h1 { color: #b45309; border-left: 4px solid #ea580c; padding-left: 0.5rem; }
+        #cpiArticle h2 { color: #c2410c; border-left: 3px solid #f59e0b; padding-left: 0.45rem; }
+        #cpiArticle h3 { color: #d97706; border-left: 3px solid #f59e0b; padding-left: 0.4rem; }
+        #cpiArticle .figure-title { color: #b45309; }
+        #cpiArticle .report-figure { border-color: #fcd34d; background: #ffffff; }
+        #cpiArticle .headline-chip { background: #fff4e6; color: #9a3412; border: 1px solid #fcd34d; }
+        #cpiArticle .metric-chip { background: #fff1e0; color: #9a3412; box-shadow: 0 0.5rem 1rem rgba(244,143,66,0.15); }
 
         .nav-label {
             display: block;
@@ -523,7 +686,7 @@
                     <p class="mb-0">面向公开市场委员会的宏观指标监测与研判平台</p>
                 </div>
                 <div class="col-md-4 text-md-end">
-                    <button class="btn btn-light" id="refreshBtn">
+                    <button class="btn btn-outline-primary" id="refreshBtn" style="border-color: var(--teal-600); color: var(--teal-600);">
                         <i class="bi bi-arrow-repeat"></i> 刷新数据
                     </button>
                 </div>
@@ -560,7 +723,7 @@
                     <!-- 左侧指标选择区 -->
                     <div class="col-lg-3 sidebar-col">
                         <div class="card">
-                            <div class="card-header bg-primary text-white">
+                            <div class="card-header text-white" style="background: linear-gradient(135deg, var(--teal-600), #128c7e);">
                                 <h5 class="mb-0"><i class="bi bi-list-ul"></i> 经济指标分类</h5>
                             </div>
                             <div class="card-body">
@@ -572,7 +735,7 @@
                         
                         <!-- 过滤器区域 -->
                         <div class="card mt-3">
-                            <div class="card-header bg-success text-white">
+                            <div class="card-header text-white" style="background: linear-gradient(135deg, #128c7e, #0f766e);">
                                 <h5 class="mb-0"><i class="bi bi-funnel"></i> 数据过滤器</h5>
                             </div>
                             <div class="card-body">
@@ -667,8 +830,8 @@
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="cpi-tab" data-bs-toggle="tab" data-bs-target="#cpiReport" type="button" role="tab" aria-controls="cpiReport" aria-selected="false" disabled>
-                            通胀（CPI）研判 <span class="badge bg-secondary ms-1">预告</span>
+                        <button class="nav-link" id="cpi-tab" data-bs-toggle="tab" data-bs-target="#cpiReport" type="button" role="tab" aria-controls="cpiReport" aria-selected="false">
+                            通胀（CPI）研判
                         </button>
                     </li>
                 </ul>
@@ -678,8 +841,8 @@
                         <div class="row g-4">
                             <div class="col-12 col-lg-4 col-xl-3">
                                 <div class="report-sidebar d-flex flex-column">
-                                    <div class="card">
-                                        <div class="card-header bg-dark text-white">
+                                        <div class="card">
+                                        <div class="card-header text-white" style="background: linear-gradient(135deg, var(--blue-700), var(--blue-500));">
                                             <h5 class="mb-1"><i class="bi bi-clipboard2-pulse"></i> 非农就业形势研判</h5>
                                             <small class="text-white-50">选择月份后，系统会绘制图表并生成文字分析</small>
                                         </div>
@@ -690,10 +853,10 @@
                                             </div>
                                             <div class="d-flex flex-column gap-2">
                                                 <div class="d-flex flex-column flex-md-row gap-2">
-                                                    <button class="btn btn-dark flex-grow-1" id="generateReportBtn">
+                                                    <button class="btn btn-nonfarm flex-grow-1" id="generateReportBtn">
                                                         <i class="bi bi-play-circle"></i> 生成图表与研报
                                                     </button>
-                                                    <button class="btn btn-outline-primary flex-grow-1" id="exportPdfBtn" disabled>
+                                                    <button class="btn btn-nonfarm-outline flex-grow-1" id="exportPdfBtn" disabled>
                                                         <i class="bi bi-file-earmark-pdf"></i> 导出PDF
                                                     </button>
                                                 </div>
@@ -763,8 +926,123 @@
                         </div>
                     </div>
                     <div class="tab-pane fade" id="cpiReport" role="tabpanel" aria-labelledby="cpi-tab">
-                        <div class="alert alert-info border-0 shadow-sm">
-                            CPI 通胀专题研判即将上线，届时将支持按权重拆分和多维可视化。
+                        <div class="row g-4">
+                            <div class="col-12 col-lg-4 col-xl-3">
+                                <div class="report-sidebar d-flex flex-column">
+                                    <div class="card">
+                                        <div class="card-header text-white" style="background: linear-gradient(135deg, var(--orange-700), var(--orange-500));">
+                                            <h5 class="mb-1"><i class="bi bi-thermometer-sun"></i> CPI 通胀研判</h5>
+                                            <small class="text-white-50">选择月份后生成同比/环比走势与拉动表</small>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label for="cpiReportMonth" class="form-label">报告月份</label>
+                                                <input type="month" class="form-control" id="cpiReportMonth">
+                                            </div>
+                                            <div class="d-flex flex-column gap-2">
+                                                <div class="d-flex flex-column flex-md-row gap-2">
+                                                    <button class="btn btn-cpi flex-grow-1" id="generateCpiBtn">
+                                                        <i class="bi bi-play-circle"></i> 生成CPI图表与研判
+                                                    </button>
+                                                    <button class="btn btn-cpi-outline flex-grow-1" id="exportCpiPdfBtn" disabled>
+                                                        <i class="bi bi-file-earmark-pdf"></i> 导出PDF
+                                                    </button>
+                                                </div>
+                                                <div id="cpiStatus" class="report-meta text-md-end text-end">请选择月份后生成。</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card report-nav mt-3">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0"><i class="bi bi-map"></i> 研报导航</h6>
+                                        </div>
+                                        <div class="list-group list-group-flush" id="cpiNavList">
+                                            <div class="list-group-item text-muted small">生成研报后显示章节</div>
+                                        </div>
+                                    </div>
+                                    <div class="card indicator-summary-card mt-3">
+                                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                            <h6 class="mb-0"><i class="bi bi-stars"></i> 关键通胀指标</h6>
+                                            <span class="text-muted small">最新</span>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="cpiIndicatorList" class="summary-list">
+                                                <div class="text-muted small">暂无数据，请先生成一次研报。</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card">
+                                        <div class="card-body small text-muted">
+                                            权重采用近似相对重要性（食品、能源、核心商品、核心服务），用于估算拉动贡献，后续可按年度更新。
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-8 col-xl-9">
+                                <div class="card h-100">
+                                    <div class="card-body">
+                                        <div class="report-article" id="cpiArticle">
+                                            <div class="report-hero">
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <span class="report-type-badge" style="background:#f59e0b;">通胀（CPI）研判</span>
+                                                    <span class="headline-chip" id="cpiHeadlineBadge">待生成</span>
+                                                </div>
+                                                <div class="metric-chip" id="cpiWindowChip" style="background:#fff4e6;color:#9a3412;border:1px solid #fcd34d;">近期区间</div>
+                                            </div>
+                                            <div class="report-body" id="cpiReportText">
+                                                <p class="text-muted">生成CPI研报后，将呈现结构化解读与图表/表格。</p>
+                                            </div>
+                                            <figure class="report-figure mt-3" id="cpiFigure1">
+                                                <div class="figure-title">图1：美国CPI、核心CPI当月同比(%)</div>
+                                                <canvas id="cpiChartYoy" height="320"></canvas>
+                                            </figure>
+                                            <figure class="report-figure" id="cpiFigure2">
+                                                <div class="figure-title">图2：CPI、核心CPI季调环比（%）</div>
+                                                <canvas id="cpiChartMom" height="320"></canvas>
+                                            </figure>
+                                            <div class="table-responsive contrib-table-wrapper" id="cpiYoyWrapper">
+                                                <div class="figure-title">表1：当月CPI同比拉动拆分</div>
+                                                <table class="table table-hover contrib-table">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>分项</th>
+                                                            <th>权重(%)</th>
+                                                            <th>本月同比(%)</th>
+                                                            <th>拉动(ppts)</th>
+                                                            <th>上月同比(%)</th>
+                                                            <th>上月拉动(ppts)</th>
+                                                            <th>拉动差异(ppts)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="cpiYoyTableBody">
+                                                        <tr><td colspan="7" class="text-center text-muted py-3">等待生成</td></tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div class="table-responsive contrib-table-wrapper" id="cpiMomWrapper">
+                                                <div class="figure-title">表2：当月季调CPI分项环比结构</div>
+                                                <table class="table table-hover contrib-table">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>分项</th>
+                                                            <th>权重(%)</th>
+                                                            <th>本月环比(%)</th>
+                                                            <th>拉动(ppts)</th>
+                                                            <th>上月环比(%)</th>
+                                                            <th>上月拉动(ppts)</th>
+                                                            <th>拉动差异(ppts)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="cpiMomTableBody">
+                                                        <tr><td colspan="7" class="text-center text-muted py-3">等待生成</td></tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div id="cpiLlmError" class="text-danger small mt-2 d-none"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -793,6 +1071,10 @@
         let chartType = 'line'; // 默认图表类型
         let activeIndicatorId = null; // 当前选中的指标ID
         let lastReportData = null; // 最新的研报数据用于导出
+        let lastCpiReportData = null;
+        let cpiChartYoy = null;
+        let cpiChartMom = null;
+        let contribCollapseState = { yoy: null, mom: null };
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
@@ -800,6 +1082,7 @@
             loadDataTable();
             initializeChart();
             initializeReportModule();
+            initializeCpiModule();
             
             // 绑定事件监听器
             document.getElementById('dateRange').addEventListener('change', updateVisualization);
@@ -1456,6 +1739,20 @@
             return match ? match[1].trim() : mdText;
         }
 
+        function stripMarkdownTables(mdText) {
+            if (!mdText) return '';
+            const lines = mdText.split(/\r?\n/);
+            const filtered = lines.filter(line => {
+                const pipes = (line.match(/\|/g) || []).length;
+                // Remove table header/rows
+                if (pipes >= 2) return false;
+                // Remove typical separator rows
+                if (/^\s*[-|: ]+\|[-|: ]+/.test(line)) return false;
+                return true;
+            });
+            return filtered.join('\n');
+        }
+
         function updateReportHero(headline, windowText) {
             const badgeEl = document.getElementById('reportHeadlineBadge');
             const windowChip = document.getElementById('reportWindow');
@@ -1875,8 +2172,459 @@
             });
         }
 
+        function updateCpiNav(headings) {
+            const navList = document.getElementById('cpiNavList');
+            if (!navList) return;
+            navList.innerHTML = '';
+            if (!headings || headings.length === 0) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'list-group-item text-muted small';
+                placeholder.textContent = '生成研报后显示章节';
+                navList.appendChild(placeholder);
+                return;
+            }
+            headings.forEach(h => {
+                const item = document.createElement('a');
+                item.className = 'list-group-item list-group-item-action';
+                item.href = `#${h.id}`;
+                item.innerHTML = `<span class="nav-label">${h.text}</span>`;
+                navList.appendChild(item);
+            });
+        }
+
         function handleLLMError(llmError) {
             const errorEl = document.getElementById('llmError');
+            if (!errorEl) return;
+            if (llmError) {
+                errorEl.textContent = llmError;
+                errorEl.classList.remove('d-none');
+            } else {
+                errorEl.classList.add('d-none');
+                errorEl.textContent = '';
+            }
+        }
+
+        // -------------------------------
+        // CPI 研报逻辑
+        // -------------------------------
+        function initializeCpiModule() {
+            const monthInput = document.getElementById('cpiReportMonth');
+            if (monthInput) {
+                const now = new Date();
+                const monthValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                monthInput.value = monthValue;
+            }
+            const btn = document.getElementById('generateCpiBtn');
+            if (btn) {
+                btn.addEventListener('click', handleCpiGeneration);
+            }
+            const pdfBtn = document.getElementById('exportCpiPdfBtn');
+            if (pdfBtn) {
+                pdfBtn.addEventListener('click', handleCpiPdfExport);
+                pdfBtn.disabled = true;
+            }
+        }
+
+        function setCpiLoading(isLoading, statusText) {
+            const btn = document.getElementById('generateCpiBtn');
+            const exportBtn = document.getElementById('exportCpiPdfBtn');
+            const status = document.getElementById('cpiStatus');
+            if (btn) {
+                btn.disabled = isLoading;
+                btn.innerHTML = isLoading
+                    ? '<span class="loading"></span> 处理中...'
+                    : '<i class="bi bi-play-circle"></i> 生成CPI图表与研判';
+            }
+            if (exportBtn && isLoading) exportBtn.disabled = true;
+            if (status) {
+                status.textContent = statusText || (isLoading ? '请稍候...' : '生成完成，可重新选择月份。');
+            }
+        }
+
+        function setCpiExportEnabled(isEnabled) {
+            const btn = document.getElementById('exportCpiPdfBtn');
+            if (btn) btn.disabled = !isEnabled;
+        }
+
+        function handleCpiGeneration() {
+            const reportMonth = document.getElementById('cpiReportMonth').value;
+            if (!reportMonth) {
+                showMessage('请先选择报告月份', 'warning');
+                return;
+            }
+            lastCpiReportData = null;
+            setCpiExportEnabled(false);
+            setCpiLoading(true, '正在生成CPI图表...');
+            fetch('/api/cpi/report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ report_month: reportMonth })
+            })
+            .then(response => response.json().then(data => {
+                if (!response.ok) {
+                    throw new Error(data.error || '生成失败');
+                }
+                return data;
+            }))
+            .then(data => {
+                lastCpiReportData = data;
+                updateCpiUI(data);
+            })
+            .catch(error => {
+                console.error('生成CPI研报失败:', error);
+                showMessage('生成CPI研报失败: ' + error.message, 'danger');
+                setCpiLoading(false, '生成失败，请重试');
+                setCpiExportEnabled(false);
+            });
+        }
+
+        function handleCpiPdfExport() {
+            if (!lastCpiReportData) {
+                showMessage('请先生成CPI研报，再导出PDF', 'info');
+                return;
+            }
+            const btn = document.getElementById('exportCpiPdfBtn');
+            const original = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span> 生成PDF...';
+            }
+            fetch('/api/cpi/report.pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ report_data: lastCpiReportData })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => { throw new Error(data.error || '导出失败'); });
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const month = lastCpiReportData.report_month || 'report';
+                a.href = url;
+                a.download = `CPI研判_${month}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                showMessage('PDF 导出完成', 'success');
+            })
+            .catch(error => {
+                console.error('导出CPI PDF失败:', error);
+                showMessage('导出CPI PDF失败: ' + error.message, 'danger');
+            })
+            .finally(() => {
+                if (btn) {
+                    btn.innerHTML = original || '<i class="bi bi-file-earmark-pdf"></i> 导出PDF';
+                    setCpiExportEnabled(!!lastCpiReportData);
+                }
+            });
+        }
+
+        function updateCpiUI(data) {
+            const windowInfo = data.chart_window;
+            const weightText = data.weight_year ? ` · 权重年份：${data.weight_year}` : '';
+            const windowText = windowInfo ? `图表区间：${windowInfo.start_date} - ${windowInfo.end_date}${weightText}` : `生成完成${weightText}`;
+            setCpiLoading(false, windowText);
+            setCpiExportEnabled(!!data);
+            const headline = document.getElementById('cpiHeadlineBadge');
+            if (headline) headline.textContent = data.headline_summary || '待生成';
+            const windowChip = document.getElementById('cpiWindowChip');
+            if (windowChip) windowChip.textContent = windowText;
+            renderCpiCharts(data);
+            renderContributionTable('cpiYoyTableBody', data.contributions_yoy, 'yoy');
+            renderContributionTable('cpiMomTableBody', data.contributions_mom, 'mom');
+            renderCpiIndicators(data.indicators);
+            renderCpiText(data.report_text);
+            handleCpiLLMError(data.llm_error);
+        }
+
+        function renderCpiCharts(data) {
+            if (cpiChartYoy) { cpiChartYoy.destroy(); cpiChartYoy = null; }
+            if (cpiChartMom) { cpiChartMom.destroy(); cpiChartMom = null; }
+
+            const yoyCanvas = document.getElementById('cpiChartYoy');
+            if (yoyCanvas) {
+                const labels = (data.yoy_series || []).map(p => p.date);
+                const cpiValues = (data.yoy_series || []).map(p => p.cpi_yoy ?? null);
+                const coreValues = (data.yoy_series || []).map(p => p.core_yoy ?? null);
+                cpiChartYoy = new Chart(yoyCanvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'CPI同比', data: cpiValues, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', tension: 0.15, pointRadius: 2 },
+                            { label: '核心CPI同比', data: coreValues, borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.12)', tension: 0.15, pointRadius: 2 },
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top', align: 'start' } },
+                        scales: { y: { title: { display: true, text: '同比(%)' } } }
+                    }
+                });
+            }
+
+            const momCanvas = document.getElementById('cpiChartMom');
+            if (momCanvas) {
+                const labels = (data.mom_series || []).map(p => p.date);
+                const cpiValues = (data.mom_series || []).map(p => p.cpi_mom ?? null);
+                const coreValues = (data.mom_series || []).map(p => p.core_mom ?? null);
+                cpiChartMom = new Chart(momCanvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'CPI环比', data: cpiValues, borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.12)', tension: 0.15, pointRadius: 2 },
+                            { label: '核心CPI环比', data: coreValues, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.12)', tension: 0.15, pointRadius: 2 },
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top', align: 'start' } },
+                        scales: { y: { title: { display: true, text: '环比(%)' } } }
+                    }
+                });
+            }
+        }
+
+        function renderContributionTable(bodyId, rows, mode) {
+            const tbody = document.getElementById(bodyId);
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            if (!rows || rows.length === 0) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="7" class="text-center text-muted py-3">暂无数据</td>`;
+                tbody.appendChild(tr);
+                return;
+            }
+            const absMax = (arr, key) => {
+                const vals = (arr || []).map(r => r[key]).filter(v => v !== null && v !== undefined).map(Number);
+                if (!vals.length) return 0;
+                return Math.max(...vals.map(v => Math.abs(v)));
+            };
+            const maxChange = absMax(rows, 'current');
+            const maxContrib = absMax(rows, 'contribution');
+            const maxDelta = absMax(rows, 'delta_contribution');
+
+            const format = (val) => (val === null || val === undefined ? '—' : Number(val).toFixed(2));
+            const bar = (val, max) => {
+                if (val === null || val === undefined) {
+                    return '<div class="text-muted">—</div>';
+                }
+                const safeMax = max || 1;
+                const width = Math.min(100, Math.abs(val || 0) / safeMax * 100);
+                const dirClass = val >= 0 ? 'pos' : 'neg';
+                return `
+                    <div class="bar-cell">
+                        <div class="d-flex align-items-center" style="gap:6px;">
+                            <span>${format(val)}</span>
+                        </div>
+                        <div class="bar-track">
+                            <div class="bar-fill ${dirClass}" style="width:${width}%; left:${val >= 0 ? '0' : `${100 - width}%`};"></div>
+                        </div>
+                    </div>
+                `;
+            };
+            const heat = (val, max) => {
+                if (val === null || val === undefined) return '<span class="text-muted">—</span>';
+                const safeMax = max || 1;
+                const intensity = Math.min(1, Math.abs(val) / safeMax);
+                const color = val >= 0
+                    ? `rgba(249,115,22,${0.35 + 0.4 * intensity})`  /* 上升橙色 */
+                    : `rgba(14,165,233,${0.35 + 0.4 * intensity})`; /* 下降青蓝 */
+                return `
+                    <span class="heat-chip">
+                        <span class="heat-dot" style="background:${color};"></span>
+                        <span>${format(val)}</span>
+                    </span>
+                `;
+            };
+
+            const nodes = (rows || []).map(r => ({ ...r, children: [] }));
+            const byLabel = new Map();
+            nodes.forEach(n => byLabel.set(n.label, n));
+            const roots = [];
+            nodes.forEach(n => {
+                const parent = n.parent_label && byLabel.get(n.parent_label);
+                if (parent) {
+                    parent.children.push(n);
+                } else {
+                    roots.push(n);
+                }
+            });
+
+            if (!contribCollapseState[mode]) {
+                const initial = new Set();
+                nodes.forEach(n => {
+                    if (n.children && n.children.length) {
+                        initial.add(n.label);
+                    }
+                });
+                contribCollapseState[mode] = initial;
+            }
+            const collapsed = contribCollapseState[mode];
+
+            const renderNode = (node, isAncestorCollapsed) => {
+                if (isAncestorCollapsed) return;
+                const hasChildren = node.children && node.children.length > 0;
+                const isCollapsed = collapsed.has(node.label);
+                const indentPx = (node.level || 0) * 14;
+                const tr = document.createElement('tr');
+                if (node.is_major && node.level === 0) tr.classList.add('major-row');
+                tr.innerHTML = `
+                    <td>
+                        <div class="d-flex align-items-center" style="gap:6px; padding-left:${indentPx}px;">
+                            ${hasChildren ? `<button class="tree-toggle" data-label="${node.label}" data-mode="${mode}" aria-label="toggle">${isCollapsed ? '▸' : '▾'}</button>` : '<span class="tree-leaf-dot"></span>'}
+                            <span class="${node.level === 0 ? 'fw-bold' : ''}">${node.label || '—'}</span>
+                        </div>
+                    </td>
+                    <td>${format(node.weight)}</td>
+                    <td>${bar(node.current, maxChange)}</td>
+                    <td>${bar(node.contribution, maxContrib)}</td>
+                    <td>${bar(node.previous, maxChange)}</td>
+                    <td>${bar(node.previous_contribution, maxContrib)}</td>
+                    <td>${heat(node.delta_contribution, maxDelta)}</td>
+                `;
+                tbody.appendChild(tr);
+                if (!isCollapsed) {
+                    (node.children || []).forEach(child => renderNode(child, false));
+                }
+            };
+
+            roots.forEach(root => renderNode(root, false));
+
+            tbody.querySelectorAll('.tree-toggle').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const label = btn.dataset.label;
+                    const m = btn.dataset.mode;
+                    const set = contribCollapseState[m] || new Set();
+                    if (set.has(label)) set.delete(label);
+                    else set.add(label);
+                    contribCollapseState[m] = set;
+                    renderContributionTable(bodyId, rows, mode);
+                });
+            });
+        }
+
+        function renderCpiIndicators(items) {
+            const wrapper = document.getElementById('cpiIndicatorList');
+            if (!wrapper) return;
+            wrapper.innerHTML = '';
+            if (!items || !items.length) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'text-muted small';
+                placeholder.textContent = '暂无数据，请先生成一次研报。';
+                wrapper.appendChild(placeholder);
+                return;
+            }
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'summary-item';
+                const delta = item.delta ? `<div class="summary-meta">Δ ${item.delta}</div>` : '';
+                card.innerHTML = `
+                    <div class="summary-title">${item.name}</div>
+                    <div class="summary-value">${item.value || '—'}</div>
+                    ${delta}
+                    ${item.context ? `<div class="summary-meta">${item.context}</div>` : ''}
+                `;
+                wrapper.appendChild(card);
+            });
+        }
+
+        function renderCpiText(reportText) {
+            const container = document.getElementById('cpiReportText');
+            if (!container) return;
+            container.innerHTML = '';
+            const fig1 = document.getElementById('cpiFigure1');
+            const fig2 = document.getElementById('cpiFigure2');
+            const table1 = document.getElementById('cpiYoyWrapper');
+            const table2 = document.getElementById('cpiMomWrapper');
+            [fig1, fig2, table1, table2].forEach(node => {
+                if (node && node.parentNode) node.parentNode.removeChild(node);
+            });
+
+            if (!reportText) {
+                const p = document.createElement('p');
+                p.className = 'text-muted';
+                p.textContent = '未能生成研报内容，请检查DeepSeek配置。';
+                container.appendChild(p);
+                [fig1, fig2, table1, table2].forEach(node => node && container.appendChild(node));
+                return;
+            }
+            const cleaned = stripMarkdownTables(stripCodeFence(reportText));
+            container.innerHTML = renderMarkdown(cleaned);
+
+            // 将图表/表格插入到对应的小标题之后，增强阅读顺序
+            function placeAfterLabel(labelText, node) {
+                if (!node) return;
+                const headings = Array.from(container.querySelectorAll('h1,h2,h3'));
+                for (const h of headings) {
+                    if ((h.textContent || '').includes(labelText)) {
+                        let insertAfter = h;
+                        let sibling = h.nextSibling;
+                        while (sibling) {
+                            if (sibling.nodeType === 1 && ['P', 'UL', 'OL'].includes(sibling.tagName)) {
+                                insertAfter = sibling;
+                                break;
+                            }
+                            sibling = sibling.nextSibling;
+                        }
+                        insertAfter.parentNode.insertBefore(node, insertAfter.nextSibling);
+                        return;
+                    }
+                }
+                container.appendChild(node);
+            }
+
+            placeAfterLabel('图1', fig1);
+            placeAfterLabel('图2', fig2);
+            placeAfterLabel('表1', table1);
+            placeAfterLabel('表2', table2);
+
+            // 用LLM小标题更新图表标题
+            const fixedFigureTitles = {
+                '图1': '图1：美国CPI、核心CPI当月同比(%)',
+                '图2': '图2：CPI、核心CPI季调环比(%)',
+                '表1': '表1：当月CPI同比拉动拆分',
+                '表2': '表2：当月季调CPI分项环比结构'
+            };
+
+            function syncFigureTitle(labelText, figureNode) {
+                if (!figureNode) return;
+                const titleEl = figureNode.querySelector('.figure-title');
+                if (!titleEl) return;
+                const fixed = fixedFigureTitles[labelText];
+                if (fixed) {
+                    titleEl.textContent = fixed;
+                    return;
+                }
+                const headings = Array.from(container.querySelectorAll('h1,h2,h3'));
+                const hit = headings.find(h => (h.textContent || '').includes(labelText));
+                if (hit) titleEl.textContent = hit.textContent.trim();
+            }
+            syncFigureTitle('图1', fig1);
+            syncFigureTitle('图2', fig2);
+            syncFigureTitle('表1', table1);
+            syncFigureTitle('表2', table2);
+
+            const headings = Array.from(container.querySelectorAll('h1,h2,h3')).map((el, idx) => {
+                if (!el.id) {
+                    const slug = `cpi-section-${idx}-${el.textContent.trim().replace(/\s+/g, '-').toLowerCase()}`;
+                    el.id = slug;
+                }
+                return { id: el.id, text: el.textContent.trim(), level: el.tagName.toLowerCase() };
+            });
+            updateCpiNav(headings);
+        }
+
+        function handleCpiLLMError(llmError) {
+            const errorEl = document.getElementById('cpiLlmError');
             if (!errorEl) return;
             if (llmError) {
                 errorEl.textContent = llmError;

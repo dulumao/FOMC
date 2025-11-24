@@ -30,7 +30,7 @@ class DeepSeekConfig:
     temperature: float = 0.25
     max_tokens: int = 1600
     top_p: float = 0.95
-    timeout: int = 30
+    timeout: int = 60
 
 
 class DeepSeekClient:
@@ -68,16 +68,23 @@ class DeepSeekClient:
         }
 
         url = f"{self.base_url}/v1/chat/completions"
-        try:
-            response = requests.post(
-                url,
-                json=payload,
-                headers=self._headers(),
-                timeout=overrides.get("timeout", self.config.timeout),
-            )
-            response.raise_for_status()
-        except requests.exceptions.RequestException as exc:
-            raise RuntimeError(f"DeepSeek request failed: {exc}") from exc
+        timeout = overrides.get("timeout", self.config.timeout)
+        last_exc: Optional[Exception] = None
+        for attempt in range(2):
+            try:
+                response = requests.post(
+                    url,
+                    json=payload,
+                    headers=self._headers(),
+                    timeout=timeout,
+                )
+                response.raise_for_status()
+                break
+            except requests.exceptions.RequestException as exc:
+                last_exc = exc
+                if attempt == 0:
+                    continue
+                raise RuntimeError(f"DeepSeek request failed: {exc}") from exc
 
         try:
             data = response.json()

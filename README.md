@@ -1,62 +1,58 @@
 # FOMC 宏观数据情报工作台
 
-面向 FOMC 场景的本地化数据与研报工作台：抓取/清洗经济数据，提供指标浏览、可视化，以及基于 DeepSeek 的自动研报。
+面向非技术用户的本地化宏观数据小工具：自动抓取清洗经济数据，提供可视化浏览，一键生成非农/CPI 研报，并可导出 PDF。
 
-## 你能做什么？
-- 浏览经济数据库：按分类选择指标，查看趋势图/数据表，附带 FRED 链接。
-- 一键生成非农专题研报：自动绘制图1~图4，生成结构化解读，可导出 PDF（当前无书签大纲）。
-- 数据更新：脚本化增量抓取与预处理，SQLite 持久化。
+## 核心功能
+- 经济指标浏览：按分类挑选指标，查看趋势图和数据表，附带 FRED 链接。
+- 研报生成：输入月份即可生成专题研报  
+  - 非农：自动绘制新增就业、行业贡献、失业率等图表，生成解读。  
+  - CPI：自动绘制同比/环比图表，生成分项拉动表。
+- PDF 导出：非农与 CPI 研报均可一键导出（包含图表和表格）。
+- 数据更新：脚本化抓取与增量更新，数据存储在本地 SQLite。
 
-## 快速开始
-1) 安装依赖
+## 简明架构
+- 数据层：从 FRED 抓取并清洗，存入本地 SQLite；`process_all_indicators.py` 负责一键更新。
+- 服务层：Flask 提供 API 和页面渲染；`webapp/app.py` 同时渲染图表、生成 PDF。
+- 前端层：单页式界面（`webapp/templates/index.html`），显示图表、表格并触发研报/PDF 导出。
+- AI 生成（可选）：如配置 DeepSeek API，可自动写研报正文；未配置时仍可生成图表和表格。
+
+## 快速上手
+1) 安装依赖  
 ```bash
 pip install -r requirements.txt
 ```
-2) 配置环境变量 `.env`
+2) 配置 `.env`（文本文件即可）  
 ```
-FRED_API_KEY=your_key          # 申请自 https://fred.stlouisfed.org/docs/api/api_key.html
-DEEPSEEK_API_KEY=your_key      # 如需生成研报
+FRED_API_KEY=你的FRED密钥       # https://fred.stlouisfed.org
+DEEPSEEK_API_KEY=可选，用于自动写研报
 ```
-3) 初始化/更新数据
+3) 初始化并更新数据  
 ```bash
-python init_database.py                     # 初始化空库
-python process_all_indicators.py            # 一键全量/增量处理（默认从 2010 抓取）
-# 或指定历史区间
-python process_all_indicators.py --start-date 2015-01-01
+python init_database.py
+python process_all_indicators.py            # 默认从 2010 年开始抓取
+# 如需指定起点：python process_all_indicators.py --start-date 2015-01-01
 ```
-4) 启动 Web 工作台
+4) 启动 Web 工作台  
 ```bash
 cd webapp
 python app.py
-# 打开 http://localhost:5000
+# 浏览器打开 http://localhost:5000
 ```
 
-## 目录导航（精简）
+## 如何生成研报
+- 非农研报：在页面选择月份，点击“生成非农研报”→ 可查看并导出 PDF。
+- CPI 研报：在页面选择月份，点击“生成CPI图表与研判”→ 可查看并导出 PDF（含分项拉动表、可视化条形+数值）。
+- 若未设置 DEEPSEEK_API_KEY，仍可生成图表和表格，正文会使用简短占位描述。
+
+## 目录速览
 ```
-data/                 数据摄取与清洗
-├─ charts/            图1~图4数据管道（非农、行业贡献、失业率比较）
-├─ collect_economic_data_from_excel.py   冷启动抓取 + 分类层级生成
-├─ data_updater.py    增量更新调度
-├─ preprocessing.py   单位/频率标准化
-└─ rate_limited_fred_api.py 等 FRED 客户端
-
-database/             SQLAlchemy Base 与模型定义
-reports/              DeepSeek 研报生成（prompt 与文本后处理）
-webapp/               Flask 前端与 API（templates/index.html 为主要页面）
-requirements.txt      运行依赖
+data/          数据抓取与清洗；charts/ 内含各类图表的数据管道
+database/      SQLAlchemy 模型定义
+reports/       研报生成与提示词（DeepSeek）
+webapp/        Flask 后端与前端模板（index.html 为主要页面）
+requirements.txt  依赖列表
 ```
 
-## Web 工作台速览
-- 经济数据浏览：左侧分类树 + 时间范围/排序过滤；右侧 Chart.js 趋势图 + 数据表。
-- 研报工作台：选择月份后生成非农研报，包含四张图与正文；侧栏提供导航与关键经济指标摘要（含 FRED 快捷链接）；支持 PDF 导出（当前无书签）。
-
-## 常用脚本
-- `init_database.py`：创建数据库表。
-- `process_all_indicators.py`：同步分类、抓取、预处理并写库（推荐入口）。
-- `update_fred_urls.py`：修正数据库中的 FRED 链接。
-- `data/data_updater.py`：面向生产的增量更新循环。
-
-## 注意事项 / 限制
-- PDF 导出当前未含书签/大纲；如需书签需额外的 PDF 后处理。
-- DeepSeek 生成研报需要设置 `DEEPSEEK_API_KEY`，否则仅呈现图表和占位文本。
-- 本项目使用本地 SQLite，生产环境可根据 SQLAlchemy 链接改为其他数据库。
+## 注意事项
+- PDF 导出默认无书签/大纲；如需书签可在导出后自行处理。
+- 本地默认使用 SQLite，生产可替换为其他数据库（调整 SQLAlchemy 连接字符串）。

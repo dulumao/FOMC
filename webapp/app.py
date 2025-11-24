@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import html
 import re
+from typing import Optional
 from bs4 import BeautifulSoup
 
 import matplotlib
@@ -34,6 +35,7 @@ from sqlalchemy import func
 from data.charts.nonfarm_jobs_chart import LaborMarketChartBuilder
 from data.charts.industry_job_contributions import IndustryContributionChartBuilder
 from data.charts.unemployment_rate_comparison import UnemploymentRateComparisonBuilder
+from data.charts.cpi_report import CpiReportBuilder
 from reports.report_generator import EconomicReportGenerator, IndicatorSummary, ReportFocus
 
 # 创建引擎和会话
@@ -61,6 +63,13 @@ def get_industry_contribution_builder():
     if not hasattr(app, "_industry_contribution_builder"):
         app._industry_contribution_builder = IndustryContributionChartBuilder(database_url=DATABASE_URL)
     return app._industry_contribution_builder
+
+
+def get_cpi_report_builder():
+    """Singleton accessor for CPI report builder."""
+    if not hasattr(app, "_cpi_report_builder"):
+        app._cpi_report_builder = CpiReportBuilder(database_url=DATABASE_URL)
+    return app._cpi_report_builder
 
 def build_economic_report():
     """Lazy init the EconomicReportGenerator, only when API key is configured."""
@@ -176,7 +185,7 @@ def simple_markdown_to_html(md_text: str) -> str:
     return "\n".join(html_parts)
 
 
-def inject_figures_into_report_html(report_html: str, charts: dict) -> str:
+def inject_figures_into_report_html(report_html: str, charts: dict, title_map: Optional[dict[int, str]] = None) -> str:
     """Insert charts after corresponding heading/paragraph (text before image)."""
     soup = BeautifulSoup(report_html or "", "html.parser")
     body = soup.body or soup
@@ -190,7 +199,7 @@ def inject_figures_into_report_html(report_html: str, charts: dict) -> str:
         fig.append(img)
         return fig
 
-    titles = {
+    titles = title_map or {
         1: "图1：新增非农就业（万人）及失业率(%，右)",
         2: "图2：分行业新增非农就业贡献率(%)",
         3: "图3：各类型失业率(%)",
@@ -216,13 +225,15 @@ def inject_figures_into_report_html(report_html: str, charts: dict) -> str:
         body.append(fig_tag)
         return False
 
-    for idx in range(1, 5):
-        key = f"chart{idx}"
-        b64 = charts.get(key)
-        if not b64:
-            continue
-        fig_tag = make_fig(idx, b64, titles.get(idx, f"图{idx}"))
-        insert_after_anchor(f"图{idx}", fig_tag)
+    if charts:
+        indices = sorted(int(k.replace("chart", "")) for k in charts.keys() if k.startswith("chart") and charts.get(k))
+        for idx in indices:
+            key = f"chart{idx}"
+            b64 = charts.get(key)
+            if not b64:
+                continue
+            fig_tag = make_fig(idx, b64, titles.get(idx, f"图{idx}"))
+            insert_after_anchor(f"图{idx}", fig_tag)
 
     return str(soup)
 
@@ -322,6 +333,166 @@ def build_pdf_charts(report_payload: dict):
 
     return figures
 
+
+def build_cpi_pdf_charts(report_payload: dict):
+    """Render CPI charts for PDF (yoy & mom), using暖色调区分风格。"""
+    plt.rcParams.update({
+        "font.family": ["Times New Roman", "KaiTi", "STKaiti", "DejaVu Serif"],
+        "axes.unicode_minus": False,
+    })
+    figures: dict[str, Optional[str]] = {}
+
+    # 图1：同比
+    try:
+        yoy_series = report_payload.get("yoy_series") or []
+        labels = [p.get("date") for p in yoy_series]
+        cpi_values = [p.get("cpi_yoy") for p in yoy_series]
+        core_values = [p.get("core_yoy") for p in yoy_series]
+        fig, ax = plt.subplots(figsize=(7.5, 4))
+        ax.plot(labels, cpi_values, color="#f97316", marker="o", linewidth=1.8, label="CPI同比")
+        ax.plot(labels, core_values, color="#ef4444", marker="o", linewidth=1.8, label="核心CPI同比")
+        ax.set_ylabel("%")
+        ax.tick_params(axis="x", rotation=45)
+        ax.legend()
+        fig.tight_layout()
+        figures["chart1"] = figure_to_base64(fig)
+    except Exception:
+        figures["chart1"] = None
+
+    # 图2：环比
+    try:
+        mom_series = report_payload.get("mom_series") or []
+        labels = [p.get("date") for p in mom_series]
+        cpi_values = [p.get("cpi_mom") for p in mom_series]
+        core_values = [p.get("core_mom") for p in mom_series]
+        fig, ax = plt.subplots(figsize=(7.5, 4))
+        ax.plot(labels, cpi_values, color="#f59e0b", marker="o", linewidth=1.8, label="CPI环比")
+        ax.plot(labels, core_values, color="#fb7185", marker="o", linewidth=1.8, label="核心CPI环比")
+        ax.set_ylabel("%")
+        ax.tick_params(axis="x", rotation=45)
+        ax.legend()
+        fig.tight_layout()
+        figures["chart2"] = figure_to_base64(fig)
+    except Exception:
+        figures["chart2"] = None
+
+    return figures
+
+
+def build_contrib_table_html(rows: list[dict], title: str) -> str:
+    """Build a hierarchical contribution table HTML for PDF export."""
+    if not rows:
+        return ""
+
+    def fmt(val):
+        return "—" if val is None else f"{val:.2f}"
+
+    # build hierarchy
+    nodes = []
+    by_label = {}
+    order = []
+    for r in rows:
+        node = {
+            "label": r.get("label"),
+            "weight": r.get("weight"),
+            "current": r.get("current"),
+            "previous": r.get("previous"),
+            "contribution": r.get("contribution"),
+            "previous_contribution": r.get("previous_contribution"),
+            "delta_contribution": r.get("delta_contribution"),
+            "is_major": r.get("is_major"),
+            "level": r.get("level") or 0,
+            "parent_label": r.get("parent_label"),
+            "children": [],
+        }
+        nodes.append(node)
+        by_label[node["label"]] = node
+        order.append(node["label"])
+
+    roots = []
+    for n in nodes:
+        parent = by_label.get(n["parent_label"])
+        if parent:
+            parent["children"].append(n)
+        else:
+            roots.append(n)
+
+    def ordered_nodes():
+        result = []
+        order_map = {label: idx for idx, label in enumerate(order)}
+
+        def walk(node):
+            result.append(node)
+            for child in sorted(node.get("children", []), key=lambda c: order_map.get(c["label"], 1e9)):
+                walk(child)
+
+        for root in sorted(roots, key=lambda r: order_map.get(r["label"], 1e9)):
+            walk(root)
+        return result
+
+    max_change = max([abs(x["current"]) for x in nodes if x["current"] is not None] or [1])
+    max_contrib = max([abs(x["contribution"]) for x in nodes if x["contribution"] is not None] or [1])
+    max_delta = max([abs(x["delta_contribution"]) for x in nodes if x["delta_contribution"] is not None] or [1])
+
+    def mini_bar(val, max_val, pos_color="#f59e0b", neg_color="#2563eb"):
+        if val is None:
+            return '<span class="muted">—</span>'
+        width = min(100, abs(val) / max_val * 100) if max_val else 0
+        color = pos_color if val >= 0 else neg_color
+        return (
+            f'<div class="mini-bar">'
+            f'  <div class="mini-fill" style="width:{width}%; background:{color}; margin-left:{0 if val>=0 else max(0,100-width)}%;"></div>'
+            f'</div>'
+        )
+
+    def value_with_bar(val, max_val, pos_color="#f59e0b", neg_color="#2563eb"):
+        """Return a stacked layout containing the numeric value and its mini bar."""
+        if val is None:
+            return '<div class="value-cell muted">—</div>'
+        bar = mini_bar(val, max_val, pos_color=pos_color, neg_color=neg_color)
+        return (
+            "<div class='value-cell'>"
+            f"  <span class='value-text'>{fmt(val)}</span>"
+            f"  {bar}"
+            "</div>"
+        )
+
+    rows_html = []
+    for n in ordered_nodes():
+        indent = n["level"] * 12
+        delta = n["delta_contribution"]
+        delta_cls = "delta-pos" if delta is not None and delta > 0 else "delta-neg" if delta is not None and delta < 0 else "muted"
+        label_html = (
+            f'<div class="label-cell" style="padding-left:{indent}px;">'
+            f'  <span class="dot"></span><span class="{ "bold" if n["is_major"] and n["level"]==0 else ""}">{n["label"] or "—"}</span>'
+            f'</div>'
+        )
+        row = (
+            "<tr>"
+            f"<td>{label_html}</td>"
+            f"<td>{fmt(n['weight'])}</td>"
+            f"<td>{value_with_bar(n['current'], max_change, pos_color='#f59e0b', neg_color='#2563eb')}</td>"
+            f"<td>{value_with_bar(n['contribution'], max_contrib, pos_color='#f97316', neg_color='#2563eb')}</td>"
+            f"<td>{fmt(n['previous'])}</td>"
+            f"<td>{fmt(n['previous_contribution'])}</td>"
+            f"<td class='{delta_cls}'>{fmt(delta)}</td>"
+            "</tr>"
+        )
+        rows_html.append(row)
+
+    table_html = (
+        f"<div class='pdf-table-block'>"
+        f"<div class='pdf-table-title'>{title}</div>"
+        "<table class='pdf-table'>"
+        "<thead><tr>"
+        "<th>分项</th><th>权重(%)</th><th>本月(%)</th><th>拉动(ppts)</th><th>上月(%)</th><th>上月拉动(ppts)</th><th>拉动差异(ppts)</th>"
+        "</tr></thead>"
+        "<tbody>"
+        + "".join(rows_html) +
+        "</tbody></table></div>"
+    )
+    return table_html
+
 def serialize_series(df: pd.DataFrame, value_key: str):
     """Serialize pandas dataframe to JSON-friendly structure."""
     records = []
@@ -331,6 +502,44 @@ def serialize_series(df: pd.DataFrame, value_key: str):
             value_key: round(float(row[value_key]), 2)
         })
     return records
+
+def serialize_multi_series(df: pd.DataFrame, value_keys: list[str]):
+    """Serialize dataframe with multiple numeric columns."""
+    records = []
+    for _, row in df.iterrows():
+        item = {"date": row["date"].strftime("%Y-%m-%d")}
+        for key in value_keys:
+            val = row.get(key)
+            item[key] = round(float(val), 2) if pd.notna(val) else None
+        records.append(item)
+    return records
+
+def build_cpi_fallback_text(report_month: str, headline: str, cpi_yoy, core_yoy, cpi_mom, core_mom, contrib_rows, weight_year):
+    """Graceful text when LLM失败/超时，基于已有数据给出简要结论。"""
+    bullets = []
+    if cpi_yoy is not None:
+        bullets.append(f"CPI同比约 {cpi_yoy:.2f}%，核心同比 {core_yoy:.2f}%" if core_yoy is not None else f"CPI同比约 {cpi_yoy:.2f}%。")
+    if cpi_mom is not None:
+        bullets.append(f"季调环比分别为 CPI {cpi_mom:.2f}%，核心 {core_mom:.2f}%" if core_mom is not None else f"季调环比约 {cpi_mom:.2f}%。")
+    # 选取拉动前后
+    major_rows = [r for r in contrib_rows if r.is_major and r.contribution is not None]
+    if not major_rows:
+        major_rows = [r for r in contrib_rows if r.contribution is not None]
+    top_pos = sorted([r for r in major_rows if r.contribution and r.contribution > 0], key=lambda x: x.contribution, reverse=True)[:2]
+    top_neg = sorted([r for r in major_rows if r.contribution and r.contribution < 0], key=lambda x: x.contribution)[:2]
+    if top_pos:
+        bullets.append("主要拉动：" + "；".join(f"{r.label} +{r.contribution:.2f}ppts" for r in top_pos))
+    if top_neg:
+        bullets.append("主要拖累：" + "；".join(f"{r.label} {r.contribution:.2f}ppts" for r in top_neg))
+    if weight_year:
+        bullets.append(f"分项权重采用 {weight_year} 年BLS公布的结构。")
+    lines = "\n".join(f"- {b}" for b in bullets) if bullets else "- 未能获取详细数据。"
+    return f"""## 核心结论（简版）
+{headline or report_month}
+
+{lines}
+
+（说明：DeepSeek超时，以上为基于已计算数据的简要摘要。）"""
 
 @app.route('/')
 def index():
@@ -899,7 +1108,20 @@ def export_labor_market_report_pdf():
         report_html=inject_figures_into_report_html(report_html, charts),
         charts=charts,
         export_month=report_month,
-        exported_at=exported_at
+        exported_at=exported_at,
+        theme={
+            "title": "非农就业研判",
+            "accent": "#1f2c3d",
+            "accent_secondary": "#2b63d9",
+            "header_start": "#1f2c3d",
+            "header_end": "#243447",
+            "badge_primary": "#0d6efd",
+            "badge_subtle": "rgba(43,99,217,0.08)",
+            "body_bg": "#f5f7fa",
+            "card_bg": "#ffffff",
+            "shadow": "0 12px 35px rgba(0,0,0,0.08)",
+            "tagline": "就业脉络 · 数据洞见"
+        }
     )
 
     try:
@@ -914,7 +1136,7 @@ def export_labor_market_report_pdf():
         </style>
         <div class="pdf-head">
           <div class="brand"><span class="icon"><span>F</span></span><span>Fed Tools · 非农研判</span></div>
-          <div class="tagline">智能洞察 · 自动撰写</div>
+          <div class="tagline">就业脉络 · 数据洞见</div>
         </div>
         """
         footer_template = """
@@ -971,6 +1193,320 @@ def export_labor_market_report_pdf():
     response = Response(pdf_bytes, mimetype='application/pdf')
     response.headers['Content-Disposition'] = f'attachment; filename=nonfarm_report_{report_month}.pdf'
     return response
+
+
+@app.route('/api/cpi/report.pdf', methods=['POST'])
+def export_cpi_report_pdf():
+    """使用Playwright生成CPI研报PDF（暖色调风格）。"""
+    payload = request.get_json() or {}
+    report_data = payload.get("report_data") or {}
+    if not report_data:
+        return jsonify({'error': '缺少report_data参数，请先生成CPI研报后再导出'}), 400
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return jsonify({'error': '缺少playwright依赖，请先安装：pip install playwright && playwright install chromium'}), 500
+
+    report_month = report_data.get("report_month") or datetime.utcnow().strftime("%Y-%m")
+    tz_cn = timezone(timedelta(hours=8))
+    exported_at = datetime.now(tz_cn).strftime("%Y-%m-%d %H:%M")
+
+    charts = build_cpi_pdf_charts(report_data)
+    report_html = simple_markdown_to_html(report_data.get("report_text") or "")
+    cpi_titles = {
+        1: "图1：美国CPI、核心CPI当月同比(%)",
+        2: "图2：CPI、核心CPI季调环比(%)",
+    }
+    contrib_tables = []
+    contrib_tables.append(build_contrib_table_html(report_data.get("contributions_yoy") or [], "表1：当月CPI同比拉动拆分"))
+    contrib_tables.append(build_contrib_table_html(report_data.get("contributions_mom") or [], "表2：当月季调CPI分项环比结构"))
+    contrib_tables = [t for t in contrib_tables if t]
+
+    pdf_html = render_template(
+        'report_pdf.html',
+        report=report_data,
+        report_html=inject_figures_into_report_html(report_html, charts, title_map=cpi_titles),
+        charts=charts,
+        export_month=report_month,
+        exported_at=exported_at,
+        contrib_tables=contrib_tables,
+        theme={
+            "title": "通胀（CPI）研判",
+            "accent": "#b45309",
+            "accent_secondary": "#fb923c",
+            "header_start": "#f97316",
+            "header_end": "#fb923c",
+            "badge_primary": "#ea580c",
+            "badge_subtle": "rgba(249,115,22,0.12)",
+            "body_bg": "#fff7ed",
+            "card_bg": "#fffdf8",
+            "shadow": "0 10px 28px rgba(244,114,35,0.15)",
+            "tagline": "通胀脉络 · 数据先行"
+        }
+    )
+
+    try:
+        header_template = """
+        <style>
+          .pdf-head { font-family: 'Times New Roman', 'KaiTi', serif; font-size: 12px; width: 100%; padding: 10px 22px 8px; color: #4a5568; display:flex; justify-content: space-between; align-items: center; box-sizing:border-box; }
+          .pdf-head .brand { display:flex; align-items:center; gap:14px; font-weight:700; letter-spacing:0.35px; }
+          .pdf-head .icon { width:30px; height:30px; border-radius:10px; background:linear-gradient(135deg,#f97316,#fb923c); position:relative; box-shadow:0 8px 20px rgba(244,114,35,0.22), inset 0 1px 0 rgba(255,255,255,0.2); display:grid; place-items:center; }
+          .pdf-head .icon::after { content:""; position:absolute; inset:4px; border-radius:8px; border:1px solid rgba(255,255,255,0.35); box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06); }
+          .pdf-head .icon span { position:relative; z-index:1; color:#fffaf0; font-size:13px; font-weight:800; font-family:'Times New Roman', serif; letter-spacing:0.4px; }
+          .pdf-head .tagline { font-weight:650; color:#9a3412; font-size: 11.5px; }
+        </style>
+        <div class="pdf-head">
+          <div class="brand"><span class="icon"><span>F</span></span><span>Fed Tools · CPI研判</span></div>
+          <div class="tagline">通胀脉络 · 数据先行</div>
+        </div>
+        """
+        footer_template = """
+        <style>
+          .pdf-foot { font-family: 'Times New Roman', 'KaiTi', serif; font-size:11.5px; width:100%; padding:8px 22px 8px; color:#9a3412; text-align:right; box-sizing:border-box; }
+        </style>
+        <div class="pdf-foot">第 <span class="pageNumber"></span> / <span class="totalPages"></span> 页</div>
+        """
+        with sync_playwright() as p:
+            browser = p.chromium.launch(args=["--no-sandbox", "--export-tagged-pdf"])
+            page = browser.new_page(viewport={"width": 1280, "height": 720})
+            page.set_content(pdf_html, wait_until="load")
+            try:
+                session = page.context.new_cdp_session(page)
+                mm_to_inch = 0.0393701
+                result = session.send("Page.printToPDF", {
+                    "printBackground": True,
+                    "displayHeaderFooter": True,
+                    "headerTemplate": header_template,
+                    "footerTemplate": footer_template,
+                    "marginTop": 20 * mm_to_inch,
+                    "marginBottom": 22 * mm_to_inch,
+                    "marginLeft": 16 * mm_to_inch,
+                    "marginRight": 16 * mm_to_inch,
+                    "paperWidth": 8.27,
+                    "paperHeight": 11.69,
+                    "generateTaggedPDF": True
+                })
+                pdf_bytes = base64.b64decode(result.get("data", b""))
+            except Exception:
+                app.logger.exception("CDP 打印失败，使用 Playwright 内置 pdf 兜底（无书签）")
+                pdf_bytes = page.pdf(
+                    print_background=True,
+                    display_header_footer=True,
+                    header_template=header_template,
+                    footer_template=footer_template,
+                    margin={"top": "20mm", "bottom": "22mm", "left": "16mm", "right": "16mm"},
+                    width="8.27in",
+                    height="11.69in",
+                )
+            browser.close()
+    except Exception as exc:
+        app.logger.exception("生成CPI PDF失败")
+        return jsonify({'error': f'生成CPI PDF失败: {exc}'}), 500
+
+    response = Response(pdf_bytes, mimetype='application/pdf')
+    response.headers['Content-Disposition'] = f'attachment; filename=cpi_report_{report_month}.pdf'
+    return response
+
+
+@app.route('/api/cpi/report', methods=['POST'])
+def generate_cpi_report():
+    """生成CPI图表、分项拉动表，并尝试调用LLM撰写简报。"""
+    payload = request.get_json() or {}
+    report_month = payload.get('report_month')
+    parsed_month = parse_report_month(report_month)
+    if not parsed_month:
+        return jsonify({'error': '报告月份格式需为YYYY-MM'}), 400
+
+    target_period = pd.Period(parsed_month, freq='M')
+    prev_period = target_period - 1
+
+    try:
+        builder = get_cpi_report_builder()
+        cpi_payload = builder.prepare_payload(as_of=parsed_month)
+        weight_year = builder.last_weight_year
+    except Exception as exc:
+        return jsonify({'error': f'生成CPI图表失败: {exc}'}), 500
+
+    # 当前与上月同比/环比
+    yoy_row = select_month_row(cpi_payload.yoy_series, target_period)
+    prev_yoy_row = select_month_row(cpi_payload.yoy_series, prev_period)
+    mom_row = select_month_row(cpi_payload.mom_series, target_period)
+    prev_mom_row = select_month_row(cpi_payload.mom_series, prev_period)
+
+    def val_or_none(row, key):
+        if row is None:
+            return None
+        val = row.get(key)
+        if pd.isna(val):
+            return None
+        return float(val)
+
+    cpi_yoy = val_or_none(yoy_row, "cpi_yoy")
+    core_yoy = val_or_none(yoy_row, "core_yoy")
+    prev_cpi_yoy = val_or_none(prev_yoy_row, "cpi_yoy")
+    prev_core_yoy = val_or_none(prev_yoy_row, "core_yoy")
+
+    cpi_mom = val_or_none(mom_row, "cpi_mom")
+    core_mom = val_or_none(mom_row, "core_mom")
+    prev_cpi_mom = val_or_none(prev_mom_row, "cpi_mom")
+    prev_core_mom = val_or_none(prev_mom_row, "core_mom")
+
+    headline_parts = []
+    if cpi_yoy is not None:
+        headline_parts.append(f"CPI同比{cpi_yoy:.2f}%")
+    if core_yoy is not None:
+        headline_parts.append(f"核心CPI同比{core_yoy:.2f}%")
+    if cpi_mom is not None and core_mom is not None:
+        headline_parts.append(f"环比{cpi_mom:.2f}% / {core_mom:.2f}%")
+    headline_summary = "，".join(headline_parts) if headline_parts else f"{report_month}缺少足够数据"
+
+    indicator_summaries: list[IndicatorSummary] = []
+    ui_metrics: list[dict] = []
+    if cpi_yoy is not None:
+        indicator_summaries.append(IndicatorSummary(
+            name="CPI同比",
+            latest_value=f"{cpi_yoy:.2f}",
+            units="%",
+            mom_change=f"{format_delta(cpi_yoy, prev_cpi_yoy, 2)} ppts" if prev_cpi_yoy is not None else None,
+            context="CPIAUCSL，经季调"
+        ))
+        ui_metrics.append({
+            'name': 'CPI同比',
+            'value': f"{cpi_yoy:.2f}%",
+            'delta': format_delta(cpi_yoy, prev_cpi_yoy, 2),
+            'context': '较上月同比变化'
+        })
+    if core_yoy is not None:
+        indicator_summaries.append(IndicatorSummary(
+            name="核心CPI同比",
+            latest_value=f"{core_yoy:.2f}",
+            units="%",
+            mom_change=f"{format_delta(core_yoy, prev_core_yoy, 2)} ppts" if prev_core_yoy is not None else None,
+            context="CPILFESL，经季调"
+        ))
+        ui_metrics.append({
+            'name': '核心CPI同比',
+            'value': f"{core_yoy:.2f}%",
+            'delta': format_delta(core_yoy, prev_core_yoy, 2),
+            'context': '较上月同比变化'
+        })
+    if cpi_mom is not None:
+        indicator_summaries.append(IndicatorSummary(
+            name="CPI环比",
+            latest_value=f"{cpi_mom:.2f}",
+            units="%",
+            mom_change=f"{format_delta(cpi_mom, prev_cpi_mom, 2)} ppts" if prev_cpi_mom is not None else None,
+            context="季调MoM"
+        ))
+        ui_metrics.append({
+            'name': 'CPI环比',
+            'value': f"{cpi_mom:.2f}%",
+            'delta': format_delta(cpi_mom, prev_cpi_mom, 2),
+            'context': '较上月环比变化'
+        })
+    if core_mom is not None:
+        indicator_summaries.append(IndicatorSummary(
+            name="核心CPI环比",
+            latest_value=f"{core_mom:.2f}",
+            units="%",
+            mom_change=f"{format_delta(core_mom, prev_core_mom, 2)} ppts" if prev_core_mom is not None else None,
+            context="季调MoM"
+        ))
+        ui_metrics.append({
+            'name': '核心CPI环比',
+            'value': f"{core_mom:.2f}%",
+            'delta': format_delta(core_mom, prev_core_mom, 2),
+            'context': '较上月环比变化'
+        })
+
+    def format_contribution_lines(rows):
+        lines = []
+        for r in rows:
+            weight_text = "NA" if r.weight is None else f"{r.weight:.2f}"
+            cur_text = "NA" if r.current is None else f"{r.current:.2f}%"
+            contrib_text = "NA" if r.contribution is None else f"{r.contribution:.2f}ppts"
+            prev_text = "NA" if r.previous is None else f"{r.previous:.2f}%"
+            prev_contrib_text = "NA" if r.previous_contribution is None else f"{r.previous_contribution:.2f}ppts"
+            delta_text = "NA" if r.delta_contribution is None else f"{r.delta_contribution:+.2f}ppts"
+            lines.append(
+                f"- {r.label}（权重{weight_text}%）: 本月 {cur_text} -> 拉动 {contrib_text}；"
+                f"上月 {prev_text} -> {prev_contrib_text}；差异 {delta_text}"
+            )
+        return "\n".join(lines)
+
+    chart_commentary = (
+        f"图表覆盖{cpi_payload.start_date:%Y-%m}至{cpi_payload.end_date:%Y-%m}。"
+        f"CPI与核心CPI同比/环比均为季调序列。"
+        + (f" 分项权重使用{weight_year}年表。" if weight_year else "")
+    )
+
+    llm_error = None
+    report_text = None
+    deepseek_key = os.getenv("DEEPSEEK_API_KEY")
+    if deepseek_key:
+        try:
+            generator = build_economic_report()
+            report_text = generator.generate_cpi_report(
+                report_month=report_month,
+                headline_summary=headline_summary,
+                inflation_metrics=indicator_summaries,
+                contributions_text_yoy=format_contribution_lines(cpi_payload.contributions_yoy),
+                contributions_text_mom=format_contribution_lines(cpi_payload.contributions_mom),
+                chart_commentary=chart_commentary
+            )
+        except Exception as exc:
+            llm_error = f'生成CPI研报失败: {exc}'
+    else:
+        llm_error = "未配置DEEPSEEK_API_KEY，无法调用研报生成。"
+
+    if not report_text:
+        report_text = build_cpi_fallback_text(
+            report_month=report_month,
+            headline=headline_summary,
+            cpi_yoy=cpi_yoy,
+            core_yoy=core_yoy,
+            cpi_mom=cpi_mom,
+            core_mom=core_mom,
+            contrib_rows=cpi_payload.contributions_yoy,
+            weight_year=weight_year
+        )
+
+    def serialize_contrib(rows):
+        output = []
+        for r in rows:
+            output.append({
+                "label": r.label,
+                "code": r.code,
+                "parent_label": r.parent_label,
+                "weight": r.weight,
+                "current": round(r.current, 2) if r.current is not None else None,
+                "previous": round(r.previous, 2) if r.previous is not None else None,
+                "contribution": round(r.contribution, 2) if r.contribution is not None else None,
+                "previous_contribution": round(r.previous_contribution, 2) if r.previous_contribution is not None else None,
+                "delta_contribution": round(r.delta_contribution, 2) if r.delta_contribution is not None else None,
+                "is_major": r.is_major,
+                "level": r.level,
+            })
+        return output
+
+    response = {
+        "report_month": report_month,
+        "headline_summary": headline_summary,
+        "chart_window": {
+            "start_date": cpi_payload.start_date.strftime("%Y-%m-%d"),
+            "end_date": cpi_payload.end_date.strftime("%Y-%m-%d"),
+        },
+        "yoy_series": serialize_multi_series(cpi_payload.yoy_series, ["cpi_yoy", "core_yoy"]),
+        "mom_series": serialize_multi_series(cpi_payload.mom_series, ["cpi_mom", "core_mom"]),
+        "contributions_yoy": serialize_contrib(cpi_payload.contributions_yoy),
+        "contributions_mom": serialize_contrib(cpi_payload.contributions_mom),
+        "indicators": ui_metrics,
+        "weight_year": weight_year,
+        "report_text": report_text,
+        "llm_error": llm_error
+    }
+    return jsonify(response)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
