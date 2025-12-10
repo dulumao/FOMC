@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
-from .deepseek_client import DeepSeekClient, DeepSeekConfig
+from fomc.infra.llm import DeepSeekClient, DeepSeekConfig
 
 
 @dataclass

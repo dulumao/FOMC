@@ -1,0 +1,785 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero-card" style="margin-bottom: 20px;">
+  <div class="pill">工具箱</div>
+  <h1>专注的三大工具</h1>
+  <p class="lede">为每个功能提供独立、沉浸的空间。上方标签切换工具，下方全宽阅读。</p>
+</div>
+
+<div class="panel">
+  <div class="tabs">
+    <div class="tab active" data-pane="pane-labor">非农研报</div>
+    <div class="tab" data-pane="pane-cpi">CPI 研报</div>
+    <div class="tab" data-pane="pane-macro">宏观事件</div>
+    <div class="tab" data-pane="pane-data">经济数据浏览</div>
+    <div class="tab disabled" title="规则模型即将上线">规则模型（占位）</div>
+  </div>
+
+  <div id="pane-labor" class="pane active">
+    <p class="muted">生成 PAYEMS/UNRATE 图表与研报，可预览与导出 PDF。</p>
+    <div class="field-row">
+      <input id="labor-month" type="month" value="{{ default_month }}">
+      <button class="btn" id="btn-labor">生成</button>
+      <button class="btn secondary" id="btn-labor-pdf">导出PDF</button>
+    </div>
+    <div id="labor-status" class="muted"></div>
+    <div id="labor-result" class="results fullwidth"></div>
+  </div>
+
+  <div id="pane-cpi" class="pane" style="display:none;">
+    <p class="muted">生成 CPI/核心 CPI 同环比图表与研报，可预览与导出 PDF。</p>
+    <div class="field-row">
+      <input id="cpi-month" type="month" value="{{ default_month }}">
+      <button class="btn" id="btn-cpi">生成</button>
+      <button class="btn secondary" id="btn-cpi-pdf">导出PDF</button>
+    </div>
+    <div id="cpi-status" class="muted"></div>
+    <div id="cpi-result" class="results fullwidth"></div>
+  </div>
+
+  <div id="pane-macro" class="pane" style="display:none;">
+    <p class="muted">宏观事件月报：DDG 搜索 + LLM 聚合。左侧列出已有月份，可刷新或查看；右侧展示事件/摘要；支持 PDF 导出。</p>
+    <div class="grid" style="grid-template-columns: 280px 1fr; gap: 12px; align-items: start;">
+      <div class="card" style="max-height:520px; overflow:auto;">
+        <div class="field-row" style="gap:8px;">
+          <input id="macro-month" type="month" value="{{ default_month }}" style="flex:1;">
+          <button class="btn" id="btn-macro-refresh">抓取</button>
+        </div>
+        <div class="field-row" style="gap:8px;">
+          <button class="btn" id="btn-load-months">刷新列表</button>
+          <select id="month-order" style="padding:8px; border-radius:10px; background:rgba(255,255,255,0.05); color:var(--text); border:1px solid var(--card-border);">
+            <option value="desc" selected>按时间降序</option>
+            <option value="asc">按时间升序</option>
+          </select>
+        </div>
+        <div id="macro-months" class="grid" style="gap:8px;"></div>
+      </div>
+
+      <div>
+        <div class="field-row" style="gap:8px;">
+          <button class="btn" id="tab-events">事件时间线</button>
+          <button class="btn secondary" id="tab-summary">月报摘要</button>
+          <button class="btn secondary" id="btn-macro-pdf">导出PDF</button>
+          <span id="macro-status" class="muted"></span>
+        </div>
+        <div class="results fullwidth" id="macro-result"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pane-data" class="pane" style="display:none;">
+    <p class="muted">从指标树选择任意指标，查看时序图与数据表。后续将接入规则模型。</p>
+    <div class="field-row" style="flex-wrap: wrap;">
+      <select id="indicator-select" style="min-width:260px; padding:10px; border-radius:12px; border:1px solid var(--card-border); background:rgba(255,255,255,0.05); color:var(--text);"></select>
+      <select id="date-range" style="min-width:140px; padding:10px; border-radius:12px; border:1px solid var(--card-border); background:rgba(255,255,255,0.05); color:var(--text);">
+        <option value="1Y">近1年</option>
+        <option value="3Y" selected>近3年</option>
+        <option value="5Y">近5年</option>
+        <option value="10Y">近10年</option>
+        <option value="all">全部</option>
+      </select>
+      <button class="btn" id="btn-indicator">加载</button>
+    </div>
+    <div id="indicator-status" class="muted"></div>
+    <div class="results fullwidth" id="indicator-result"></div>
+  </div>
+</div>
+
+<script>
+  // Tabs switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      if (tab.classList.contains('disabled')) return;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.pane').forEach(p => p.style.display = 'none');
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.pane).style.display = '';
+    });
+  });
+
+  const renderMarkdownLite = (text = "") => {
+    const escapeHtml = (str) => str.replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch] || ch));
+    const lines = text.split(/\r?\n/);
+    let html = "";
+    for (const line of lines) {
+      if (!line.trim()) {
+        html += "<br>";
+        continue;
+      }
+      const headingMatch = line.match(/^(#+)\s+(.*)$/);
+      if (headingMatch) {
+        const hashes = headingMatch[1].length;
+        const tag = hashes === 1 ? "h3" : hashes === 2 ? "h4" : "h5";
+        html += `<${tag}>${escapeHtml(headingMatch[2])}</${tag}>`;
+        continue;
+      }
+      if (line.startsWith("- ")) {
+        html += `<div class="pill-inline">• ${escapeHtml(line.slice(2))}</div>`;
+      } else {
+        html += `<p>${escapeHtml(line)}</p>`;
+      }
+    }
+    return html;
+  };
+
+  const themeColors = (() => {
+    const styles = getComputedStyle(document.documentElement);
+    const fetch = (key, fallback) => (styles.getPropertyValue(key) || "").trim() || fallback;
+    return {
+      text: fetch("--text", "#cdd6e4"),
+      muted: fetch("--muted", "#94a3b8"),
+      grid: "rgba(255, 255, 255, 0.08)",
+      accent: fetch("--accent", "#38bdf8"),
+      accent2: fetch("--accent-2", "#22d3ee"),
+    };
+  })();
+
+  const summarizeIndicators = (list = []) =>
+    list
+      .map((item) => `${item.name}: ${item.latest_value}${item.units || ""}${item.mom_change ? "（环比" + item.mom_change + "）" : ""}`)
+      .join(" · ");
+
+  const renderContribTable = (title, rows = []) => {
+    if (!rows.length) return "";
+    const header = `<div class="contrib-title">${title}</div>`;
+    const body = rows
+      .map((r) => {
+        const indent = (r.level || 0) * 12;
+        const delta = r.delta_contribution;
+        const deltaCls = delta > 0 ? "pos" : delta < 0 ? "neg" : "muted";
+        const val = (v) => (v === null || v === undefined ? "—" : Number(v).toFixed(2));
+        return `
+          <tr>
+            <td><div style="padding-left:${indent}px;"><span class="dot"></span>${r.label || "—"}</div></td>
+            <td>${val(r.weight)}</td>
+            <td>${val(r.current)}</td>
+            <td>${val(r.contribution)}</td>
+            <td>${val(r.previous)}</td>
+            <td>${val(r.previous_contribution)}</td>
+            <td class="${deltaCls}">${val(r.delta_contribution)}</td>
+          </tr>
+        `;
+      })
+      .join("");
+    return `
+      <div class="contrib-table-wrap">
+        ${header}
+        <table class="contrib-table">
+          <thead><tr><th>分项</th><th>权重(%)</th><th>本月(%)</th><th>拉动(ppts)</th><th>上月(%)</th><th>上月拉动</th><th>差异</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
+  };
+
+  async function callApi(url, statusEl, resultEl, onSuccess) {
+    statusEl.textContent = "加载中…";
+    statusEl.style.color = "";
+    resultEl.innerHTML = "";
+    try {
+      const resp = await fetch(url);
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.detail || data.error || "请求失败");
+      }
+      statusEl.textContent = "";
+      onSuccess(data, resultEl);
+    } catch (err) {
+      statusEl.textContent = err.message || "请求失败";
+      statusEl.style.color = "#f87171";
+    }
+  }
+
+  const laborTitles = {
+    1: "图1：新增非农就业（万人）及失业率(%，右)",
+    2: "图2：分行业新增非农就业贡献率(%)",
+    3: "图3：各类型失业率(%)",
+    4: "图4：就业率和劳动参与率(%)",
+  };
+  const cpiTitles = {
+    1: "图1：美国CPI、核心CPI当月同比(%)",
+    2: "图2：CPI、核心CPI季调环比(%)",
+  };
+
+  // 非农
+  document.getElementById("btn-labor").addEventListener("click", () => {
+    const month = document.getElementById("labor-month").value;
+    const resultEl = document.getElementById("labor-result");
+    callApi(`/api/reports/labor?month=${month}`, document.getElementById("labor-status"), resultEl, (data, el) => {
+      const insight = summarizeIndicators(data.indicators || []);
+      const markdown = data.report_text || buildLaborFallbackText(data);
+      const reportHtml = renderMarkdownLite(markdown);
+      el.innerHTML = `
+        <div class="card wide-card">
+          <div class="title">结论｜${data.headline_summary || "缺少数据"}</div>
+          <div class="muted">窗口 ${data.chart_window?.start_date || ""} → ${data.chart_window?.end_date || ""}</div>
+          <div class="summary-card">
+            <div class="pill-inline">指标快照：${insight || "暂无数据"}</div>
+            <p class="muted">${data.chart_commentary || data.llm_error || ""}</p>
+          </div>
+          <div class="report-body" id="labor-report-body">${reportHtml}</div>
+        </div>
+      `;
+      insertChartsIntoReport(
+        document.getElementById("labor-report-body"),
+        buildLaborCharts(data),
+        laborTitles
+      );
+    });
+  });
+  document.getElementById("btn-labor-pdf").addEventListener("click", () => {
+    const month = document.getElementById("labor-month").value;
+    window.open(`/api/reports/labor.pdf?month=${month}`, "_blank");
+  });
+
+  // CPI
+  document.getElementById("btn-cpi").addEventListener("click", () => {
+    const month = document.getElementById("cpi-month").value;
+    const resultEl = document.getElementById("cpi-result");
+    callApi(`/api/reports/cpi?month=${month}`, document.getElementById("cpi-status"), resultEl, (data, el) => {
+      const insight = summarizeIndicators(data.indicators || []);
+      const markdown = data.report_text || buildCpiFallbackText(data);
+      const reportHtml = renderMarkdownLite(markdown);
+      const tablesHtml = [
+        renderContribTable("表1：当月CPI同比拉动拆分", data.contributions_yoy || []),
+        renderContribTable("表2：当月季调CPI分项环比结构", data.contributions_mom || []),
+      ].join("");
+      el.innerHTML = `
+        <div class="card wide-card">
+          <div class="title">结论｜${data.headline_summary || "缺少数据"}</div>
+          <div class="pill-inline">指标快照：${insight || "暂无数据"}</div>
+          <div class="muted">${data.chart_commentary || data.llm_error || ""}</div>
+          <div class="report-body" id="cpi-report-body">${reportHtml}</div>
+          <div class="contrib-block">${tablesHtml}</div>
+        </div>
+      `;
+      insertChartsIntoReport(
+        document.getElementById("cpi-report-body"),
+        buildCpiCharts(data),
+        cpiTitles
+      );
+    });
+  });
+  document.getElementById("btn-cpi-pdf").addEventListener("click", () => {
+    const month = document.getElementById("cpi-month").value;
+    window.open(`/api/reports/cpi.pdf?month=${month}`, "_blank");
+  });
+
+  // 宏观事件
+  let macroMode = "events";
+  let macroCurrentMonth = document.getElementById("macro-month").value;
+  document.getElementById("tab-events").addEventListener("click", () => { macroMode = "events"; fetchMacro(false); });
+  document.getElementById("tab-summary").addEventListener("click", () => { macroMode = "summary"; fetchMacro(false); });
+  document.getElementById("btn-macro-refresh").addEventListener("click", () => fetchMacro(true));
+  document.getElementById("btn-macro-pdf").addEventListener("click", () => {
+    window.open(`/api/macro-events/pdf?month=${macroCurrentMonth}`, "_blank");
+  });
+  document.getElementById("btn-load-months").addEventListener("click", loadMonths);
+  document.getElementById("month-order").addEventListener("change", loadMonths);
+
+  const renderSummary = (html) => {
+    if (!html) return '<div class="muted">尚未生成月报摘要</div>';
+    const wrap = document.createElement("div");
+    wrap.className = "summary-card";
+    const replaced = (html || "").replace(/(https?:\/\/[^\s<]+)/g, (m) => `<a class="link-chip" href="${m}" target="_blank">${m}</a>`);
+    wrap.innerHTML = replaced;
+    wrap.querySelectorAll("a").forEach((a) => {
+      a.classList.add("link-chip");
+    });
+    return wrap.outerHTML;
+  };
+
+  const renderEvents = (events = []) => {
+    if (!events.length) return '<div class="muted">暂无事件</div>';
+    const sorted = [...events].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    return `
+      <div class="timeline">
+        ${sorted
+          .map((e) => {
+            const channels = (e.impact_channel || []).join(" / ") || "渠道未知";
+            const sources = (e.sources || []).map((s, idx) => {
+              const url = (e.source_urls || [])[idx] || "#";
+              return `<a class="source-chip" href="${url}" target="_blank">${s || "来源"}</a>`;
+            }).join("");
+            const scoreChip = e.importance_score ? `<span class="pill">Score ${e.importance_score}</span>` : "";
+            return `
+              <div class="timeline-item">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                  <div class="event-meta">
+                    <span class="pill">${e.date || "日期未明"}</span>
+                    <span class="pill">${(e.macro_shock_type || "其他").replaceAll("_", " ")}</span>
+                    <span class="pill">${channels}</span>
+                    ${scoreChip}
+                  </div>
+                  <h4>${e.title || "未命名事件"}</h4>
+                  <div class="summary">${e.summary || "暂无摘要"}</div>
+                  ${sources ? `<div class="event-sources">${sources}</div>` : ""}
+                </div>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
+  };
+
+  async function fetchMacro(refresh = false) {
+    const month = macroCurrentMonth;
+    const status = document.getElementById("macro-status");
+    const result = document.getElementById("macro-result");
+    status.textContent = refresh ? "重新抓取中…" : "读取中…";
+    status.style.color = "";
+    result.innerHTML = "";
+    try {
+      const resp = await fetch(`/api/macro-events?month=${month}${refresh ? "&refresh=true" : ""}`);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || data.error || "请求失败");
+      status.textContent = "";
+      const summaryBlock = renderSummary(data.monthly_summary_html);
+      const eventsBlock = `<h3 class="section-title">事件时间线</h3><div class="grid">${renderEvents(data.events)}</div>`;
+      const content = macroMode === "summary" ? summaryBlock : eventsBlock;
+      result.innerHTML = `
+        <div class="card wide-card">
+          <div class="title">月份 ${data.month_key}</div>
+          <div class="muted">事件 ${data.num_events || data.events?.length || 0} 条，状态 ${data.status || "unknown"}</div>
+          ${content}
+        </div>
+      `;
+      loadMonths(false);
+    } catch (err) {
+      status.textContent = err.message || "请求失败";
+      status.style.color = "#f87171";
+    }
+  }
+
+  async function loadMonths(showStatus=true) {
+    const status = document.getElementById("macro-status");
+    const order = document.getElementById("month-order").value;
+    const listEl = document.getElementById("macro-months");
+    if (showStatus) status.textContent = "加载月份列表…";
+    try {
+      const resp = await fetch(`/api/macro-events/months?order=${order}`);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || "加载失败");
+      status.textContent = "";
+      listEl.innerHTML = (data || []).map((row) => {
+        return `<button class="btn" style="width:100%; text-align:left;" data-month="${row.month_key}">${row.month_key} · ${row.status}</button>`;
+      }).join("");
+      listEl.querySelectorAll("button").forEach(btn => {
+        btn.addEventListener("click", () => {
+          macroCurrentMonth = btn.dataset.month;
+          document.getElementById("macro-month").value = macroCurrentMonth;
+          fetchMacro(false);
+        });
+      });
+    } catch (err) {
+      status.textContent = err.message || "加载失败";
+      status.style.color = "#f87171";
+    }
+  }
+  loadMonths(false);
+
+  // 指标浏览
+  function collectIndicatorOptions(nodes, depth = 0, bucket = []) {
+    (nodes || []).forEach((n) => {
+      if (n.type === "category") {
+        bucket.push({ kind: "category", label: n.name, depth });
+        if (n.children) collectIndicatorOptions(n.children, depth + 1, bucket);
+      } else if (n.type === "indicator") {
+        bucket.push({ kind: "indicator", depth, id: n.id, name: n.name, code: n.code });
+      }
+    });
+    return bucket;
+  }
+  async function loadIndicatorTree() {
+    try {
+      const resp = await fetch('/api/indicators');
+      const data = await resp.json();
+      const options = collectIndicatorOptions(data || []);
+      const select = document.getElementById("indicator-select");
+      select.innerHTML = options.map((opt) => {
+        const indent = "&nbsp;".repeat(opt.depth * 2);
+        if (opt.kind === "category") {
+          const prefix = opt.depth ? "↳ " : "";
+          return `<option value="" disabled class="opt-category">${indent}${prefix}${opt.label}</option>`;
+        }
+        const prefix = opt.depth ? "• " : "";
+        return `<option value="${opt.id}" class="opt-indicator">${indent}${prefix}${opt.name} (${opt.code || ""})</option>`;
+      }).join("\n");
+      const firstIndicator = options.find((o) => o.kind === "indicator");
+      if (firstIndicator) {
+        select.value = String(firstIndicator.id);
+      }
+    } catch (e) {
+      document.getElementById("indicator-status").textContent = "指标列表加载失败";
+    }
+  }
+  loadIndicatorTree();
+
+  function renderIndicatorChart(data) {
+    const canvas = document.createElement('canvas');
+    canvas.height = 220;
+    const ctx = canvas.getContext('2d');
+    const labels = data.dates || [];
+    const values = data.values || [];
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: `${data.indicator_name || ''}${data.indicator_units ? ` (${data.indicator_units})` : ""}`,
+          data: values,
+          borderColor: themeColors.accent,
+          backgroundColor: 'rgba(56, 189, 248, 0.15)',
+          tension: 0.18,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointHitRadius: 10,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        elements: { line: { borderWidth: 2 }, point: { borderWidth: 1 } },
+        scales: {
+          x: { ticks: { maxTicksLimit: 8, color: themeColors.muted }, grid: { color: themeColors.grid } },
+          y: { ticks: { color: themeColors.muted }, grid: { color: themeColors.grid } }
+        },
+        plugins: {
+          legend: { display: true, labels: { color: themeColors.text } },
+          tooltip: {
+            enabled: true,
+            mode: 'index',
+            intersect: false,
+            backgroundColor: 'rgba(8, 16, 28, 0.9)',
+            titleColor: '#fff',
+            bodyColor: '#fff'
+          }
+        }
+      }
+    });
+    return canvas;
+  }
+
+  document.getElementById("btn-indicator").addEventListener("click", async () => {
+    const indicatorId = document.getElementById("indicator-select").value;
+    const dateRange = document.getElementById("date-range").value;
+    const status = document.getElementById("indicator-status");
+    const result = document.getElementById("indicator-result");
+    status.textContent = "加载中…"; result.innerHTML = ""; status.style.color = "";
+    try {
+      const resp = await fetch(`/api/indicator-data?indicator_id=${indicatorId}&date_range=${dateRange}`);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || data.error || "请求失败");
+      status.textContent = `${(data.dates || []).length} 条记录`;
+      const chart = renderIndicatorChart(data);
+      const rows = (data.dates || []).map((d, idx) => `<tr><td>${d}</td><td>${data.values[idx]}</td></tr>`).join("\n");
+      result.innerHTML = `<div class="card wide-card"><div class="title">${data.indicator_name || '指标'}</div><div class="chart-holder"></div><table class="data-table"><thead><tr><th>日期</th><th>值</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      result.querySelector('.chart-holder').appendChild(chart);
+    } catch (err) {
+      status.textContent = err.message || "请求失败";
+      status.style.color = "#f87171";
+    }
+  });
+
+  // Chart helpers
+  function makeChartFigure(canvas, title) {
+    const fig = document.createElement("figure");
+    fig.className = "chart-figure";
+    const caption = document.createElement("figcaption");
+    caption.textContent = title || "";
+    const holder = document.createElement("div");
+    holder.className = "chart-holder";
+    holder.appendChild(canvas);
+    fig.appendChild(caption);
+    fig.appendChild(holder);
+    return fig;
+  }
+
+  function insertChartsIntoReport(container, chartMap, titleMap = {}) {
+    if (!container || !chartMap) return;
+    const used = new Set();
+    const headings = Array.from(container.querySelectorAll("h2,h3,h4,h5"));
+    headings.forEach((h) => {
+      const match = (h.textContent || "").match(/图\s*(\d+)/);
+      if (!match) return;
+      const idx = match[1];
+      const key = `chart${idx}`;
+      const chartEl = chartMap[key];
+      if (!chartEl) return;
+      const fig = makeChartFigure(chartEl, titleMap[idx] || h.textContent || `图${idx}`);
+      let anchor = h.nextElementSibling;
+      while (anchor && anchor.tagName === "BR") {
+        anchor = anchor.nextElementSibling;
+      }
+      if (anchor && !/^H[1-6]$/.test(anchor.tagName)) {
+        anchor.after(fig);
+      } else {
+        h.after(fig);
+      }
+      used.add(key);
+    });
+    Object.keys(chartMap || {}).forEach((key) => {
+      if (used.has(key)) return;
+      const idx = key.replace("chart", "");
+      container.appendChild(makeChartFigure(chartMap[key], titleMap[idx] || `图${idx}`));
+    });
+  }
+
+  function buildLaborFallbackText(data) {
+    const contrib = data.industry_contribution || {};
+    const pos = (contrib.top_positive || []).map((x) => `${x.label} ${x.value ?? ""}%`).join("，");
+    const neg = (contrib.top_negative || []).map((x) => `${x.label} ${x.value ?? ""}%`).join("，");
+    const industryLine = contrib.latest_period
+      ? `${contrib.latest_period} 分行业贡献：${pos || "主要拉动缺失"}；${neg || "拖累不明显"}。`
+      : "展示最近12个月的分行业贡献率。";
+    return [
+      "## 图1：新增非农就业与失业率",
+      data.chart_commentary || "基于 PAYEMS 与 UNRATE 的近三年窗口走势。",
+      "## 图2：分行业新增非农就业贡献率",
+      industryLine,
+      "## 图3：各类型失业率对比",
+      "展示 U1~U6 当月值与上月对比。",
+      "## 图4：就业率与劳动参与率",
+      "近24个月就业率与劳动参与率的并行走势。",
+    ].join("\n");
+  }
+
+  function buildCpiFallbackText(data) {
+    return [
+      "## 图1：美国CPI、核心CPI当月同比",
+      data.chart_commentary || "展示近期 CPI/核心CPI 同比走势。",
+      "## 图2：CPI、核心CPI季调环比",
+      "展示近期 CPI/核心CPI 环比变化。",
+    ].join("\n");
+  }
+
+  function buildLaborCharts(data) {
+    const charts = {};
+    const chart1 = createHeadlineChart(data);
+    if (chart1) charts.chart1 = chart1;
+    const chart2 = createIndustryChart(data.industry_contribution || {});
+    if (chart2) charts.chart2 = chart2;
+    const chart3 = createUnemploymentTypesChart(data.unemployment_types_series || []);
+    if (chart3) charts.chart3 = chart3;
+    const chart4 = createEmploymentParticipationChart(data.employment_participation_series || []);
+    if (chart4) charts.chart4 = chart4;
+    return charts;
+  }
+
+  function buildCpiCharts(data) {
+    const charts = {};
+    const chart1 = createCpiChart(data.yoy_series || [], { cpi: "cpi_yoy", core: "core_yoy" }, "同比(%)");
+    if (chart1) charts.chart1 = chart1;
+    const chart2 = createCpiChart(data.mom_series || [], { cpi: "cpi_mom", core: "core_mom" }, "环比(%)");
+    if (chart2) charts.chart2 = chart2;
+    return charts;
+  }
+
+  const palette = ["#38bdf8", "#22c55e", "#f59e0b", "#a78bfa", "#ef4444", "#0ea5e9", "#14b8a6", "#f97316", "#ec4899"];
+
+  function createHeadlineChart(data) {
+    const payems = data.payems_series || [];
+    const unemployment = data.unemployment_series || [];
+    if (!payems.length) return null;
+    const labels = payems.map((p) => p.date);
+    const unempMap = new Map(unemployment.map((u) => [u.date, u.value]));
+    const canvas = document.createElement("canvas");
+    canvas.height = 260;
+    const ctx = canvas.getContext("2d");
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            type: "bar",
+            label: "新增非农就业（万人）",
+            data: payems.map((p) => p.monthly_change_10k ?? p.value ?? null),
+            backgroundColor: "rgba(56, 189, 248, 0.65)",
+            borderColor: themeColors.accent,
+            borderWidth: 1,
+            order: 2,
+            yAxisID: "y",
+          },
+          {
+            type: "line",
+            label: "失业率(%)",
+            data: labels.map((d) => unempMap.get(d) ?? null),
+            borderColor: "#f59e0b",
+            backgroundColor: "transparent",
+            tension: 0.2,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+            pointHitRadius: 10,
+            borderWidth: 2,
+            order: 1,
+            yAxisID: "y1",
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: { ticks: { maxTicksLimit: 8, color: themeColors.muted }, grid: { color: themeColors.grid } },
+          y: {
+            position: "left",
+            ticks: { color: themeColors.muted },
+            grid: { color: themeColors.grid },
+            title: { display: true, text: "万人", color: themeColors.muted },
+          },
+          y1: {
+            position: "right",
+            ticks: { color: themeColors.muted },
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: "%", color: themeColors.muted },
+          },
+        },
+        plugins: {
+          legend: { labels: { color: themeColors.text } },
+          tooltip: { mode: "index", intersect: false, backgroundColor: "rgba(8,16,28,0.9)", titleColor: "#fff", bodyColor: "#fff" },
+        },
+      },
+    });
+    return canvas;
+  }
+
+  function createIndustryChart(contrib) {
+    const labels = (contrib.labels || []).slice().reverse();
+    if (!labels.length) return null;
+    const datasets = (contrib.datasets || []).map((ds, idx) => ({
+      label: ds.label || ds.code || `分项${idx + 1}`,
+      data: (ds.data || []).slice().reverse(),
+      backgroundColor: palette[idx % palette.length],
+      stack: "contrib",
+      borderWidth: 0,
+    }));
+    const canvas = document.createElement("canvas");
+    canvas.height = 260;
+    const ctx = canvas.getContext("2d");
+    new Chart(ctx, {
+      type: "bar",
+      data: { labels, datasets },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: { stacked: true, ticks: { color: themeColors.muted }, grid: { color: themeColors.grid }, title: { display: true, text: "贡献率(%)", color: themeColors.muted } },
+          y: { stacked: true, ticks: { color: themeColors.muted }, grid: { color: themeColors.grid } },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { mode: "index", intersect: false, backgroundColor: "rgba(8,16,28,0.9)", titleColor: "#fff", bodyColor: "#fff" },
+        },
+      },
+    });
+    return canvas;
+  }
+
+  function createUnemploymentTypesChart(series) {
+    if (!series.length) return null;
+    const labels = series.map((s) => s.label);
+    const prevVals = series.map((s) => s.previous ?? null);
+    const currVals = series.map((s) => s.current ?? null);
+    const canvas = document.createElement("canvas");
+    canvas.height = 240;
+    const ctx = canvas.getContext("2d");
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          { label: "上月", data: prevVals, backgroundColor: "rgba(148, 163, 184, 0.5)", stack: "rates" },
+          { label: "本月", data: currVals, backgroundColor: themeColors.accent, stack: "rates" },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: { stacked: false, ticks: { color: themeColors.muted }, grid: { color: themeColors.grid } },
+          y: { stacked: false, ticks: { color: themeColors.muted }, grid: { color: themeColors.grid }, title: { display: true, text: "%", color: themeColors.muted } },
+        },
+        plugins: {
+          legend: { labels: { color: themeColors.text } },
+          tooltip: { mode: "index", intersect: false, backgroundColor: "rgba(8,16,28,0.9)", titleColor: "#fff", bodyColor: "#fff" },
+        },
+      },
+    });
+    return canvas;
+  }
+
+  function createEmploymentParticipationChart(series) {
+    if (!series.length) return null;
+    const labels = series.map((s) => s.date);
+    const empVals = series.map((s) => s.employment_rate ?? null);
+    const partVals = series.map((s) => s.participation_rate ?? null);
+    const canvas = document.createElement("canvas");
+    canvas.height = 240;
+    const ctx = canvas.getContext("2d");
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { label: "就业率(%)", data: empVals, borderColor: themeColors.accent, tension: 0.2, pointRadius: 2.5, pointHoverRadius: 5, pointHitRadius: 10 },
+          { label: "劳动参与率(%)", data: partVals, borderColor: "#f97316", tension: 0.2, pointRadius: 2.5, pointHoverRadius: 5, pointHitRadius: 10 },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: { ticks: { maxTicksLimit: 8, color: themeColors.muted }, grid: { color: themeColors.grid } },
+          y: { ticks: { color: themeColors.muted }, grid: { color: themeColors.grid } },
+        },
+        plugins: {
+          legend: { labels: { color: themeColors.text } },
+          tooltip: { mode: "index", intersect: false, backgroundColor: "rgba(8,16,28,0.9)", titleColor: "#fff", bodyColor: "#fff" },
+        },
+      },
+    });
+    return canvas;
+  }
+
+  function createCpiChart(series, keys, labelSuffix) {
+    if (!series.length) return null;
+    const canvas = document.createElement("canvas");
+    canvas.height = 240;
+    const ctx = canvas.getContext("2d");
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: series.map((r) => r.date),
+        datasets: [
+          { label: `CPI ${labelSuffix}`, data: series.map((r) => r[keys.cpi] ?? null), borderColor: "#f97316", tension: 0.2, pointRadius: 2.5, pointHoverRadius: 5, pointHitRadius: 10 },
+          { label: `核心CPI ${labelSuffix}`, data: series.map((r) => r[keys.core] ?? null), borderColor: "#a78bfa", tension: 0.2, pointRadius: 2.5, pointHoverRadius: 5, pointHitRadius: 10 },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: { ticks: { maxTicksLimit: 8, color: themeColors.muted }, grid: { color: themeColors.grid } },
+          y: { ticks: { color: themeColors.muted }, grid: { color: themeColors.grid } },
+        },
+        plugins: {
+          legend: { labels: { color: themeColors.text } },
+          tooltip: { mode: "index", intersect: false, backgroundColor: "rgba(8,16,28,0.9)", titleColor: "#fff", bodyColor: "#fff" },
+        },
+      },
+    });
+    return canvas;
+  }
+</script>
+{% endblock %}

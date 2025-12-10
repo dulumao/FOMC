@@ -4,13 +4,13 @@
 
 ## 仓库结构（重构版）
 - `docs/`：项目指南针与开发蓝图。
-- `src/fomc/`：统一代码包  
+- `src/fomc/`：统一代码包（保持单一顶级包便于安装/导入）  
   - `config/`：路径与 .env 加载  
-  - `infra/`：数据库引擎  
+  - `infra/`：数据库引擎、统一 LLM 客户端  
   - `data/`：指标抓取/图表、宏观事件流水线与数据库模型  
   - `reports/`：LLM 研报生成（非农/CPI）  
   - `apps/`：统一 Web 门户（FastAPI + 内嵌 Flask 报告服务）、CLI 脚本  
-- `data/`：运行期 SQLite 文件（`fomc_data.db`、`macro_events.db`）。
+- `data/`：运行期 SQLite 文件（`data/fomc_data.db`、`data/macro_events.db`）。
 - `references/`：旧版子项目代码，仅供参考，不参与运行。
 
 ## 快速使用
@@ -32,6 +32,6 @@ uvicorn fomc.apps.web.main:app --app-dir src --reload --port 9000
 
 ## 运行与数据管理说明
 - 环境变量：在仓库根创建 `.env`，至少包含 `FRED_API_KEY`，可选 `DEEPSEEK_API_KEY`。  
-- 数据库：默认路径 `data/fomc_data.db`（指标/研报）和 `data/macro_events.db`（宏观事件），`fomc.config.paths` 统一管理。  
+- 数据库：默认路径 `data/fomc_data.db`（指标/研报）和 `data/macro_events.db`（宏观事件），`fomc.config.paths` 统一管理并在缺失时自动创建目录。  
 - CLI：`python -m fomc.apps.cli.init_database` 创建表；`python -m fomc.apps.cli.process_all_indicators` 同步指标；宏观事件可通过 Web 入口触发刷新。  
 - Web：推荐 `uvicorn fomc.apps.web.main:app --app-dir src --reload --port 9000`；如不开 reloader 可去掉 `--reload`。
