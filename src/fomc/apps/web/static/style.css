@@ -276,8 +276,8 @@ header {
 }
 
 .report-body .chart-figure {
-  width: 80%;
-  max-width: 80%;
+  width: 100%;
+  max-width: 640px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -377,18 +377,92 @@ input[type="month"] {
   flex-direction: column;
   gap: 12px;
   line-height: 1.7;
-  max-width: 640px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
+.report-body p,
+.report-body .md-list {
+  max-width: 640px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.report-body h2,
 .report-body h3,
 .report-body h4,
 .report-body h5 {
-  margin: 10px 0 4px;
+  width: 100%;
+  max-width: 640px;
+  margin: 14px auto 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(34, 211, 238, 0.06));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.2px;
+}
+
+.report-body h2 {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.report-body h3 {
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.report-body h4,
+.report-body h5 {
+  font-size: 14px;
+  font-weight: 800;
+  opacity: 0.96;
 }
 
 .report-body p {
-  margin: 2px 0;
+  margin: 2px auto;
+  color: var(--text);
+}
+
+.report-body strong {
+  color: var(--accent-2);
+  font-weight: 850;
+}
+
+.report-body em {
+  color: rgba(233, 237, 245, 0.92);
+}
+
+.report-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  color: rgba(233, 237, 245, 0.95);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.report-body a {
+  color: var(--accent-2);
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(122, 224, 214, 0.55);
+}
+
+.report-body a:hover {
+  border-bottom-color: rgba(122, 224, 214, 0.9);
+}
+
+.report-body .md-list {
+  margin: 6px auto 2px;
+  padding: 0 0 0 18px;
+  color: var(--text);
+}
+
+.report-body .md-list li {
+  margin: 4px 0;
   color: var(--text);
 }
 
@@ -404,10 +478,10 @@ input[type="month"] {
   padding: 12px;
   background: linear-gradient(145deg, rgba(14, 24, 38, 0.92), rgba(10, 18, 32, 0.96));
   box-shadow: var(--shadow);
-  width: 80%;
-  max-width: 80%;
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
-  min-width: 360px;
+  overflow-x: auto;
 }
 
 .contrib-table-wrap .figure-title {
@@ -420,13 +494,16 @@ input[type="month"] {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
+  table-layout: fixed;
 }
 
 .contrib-table th,
 .contrib-table td {
   border: 1px solid var(--card-border);
-  padding: 8px 10px;
+  padding: 8px 8px;
   color: var(--text);
+  vertical-align: top;
+  overflow: hidden;
 }
 
 .contrib-table th {
@@ -434,10 +511,38 @@ input[type="month"] {
   color: var(--muted);
   font-weight: 700;
   text-align: left;
+  white-space: nowrap;
+}
+
+.contrib-table td {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.contrib-table td:first-child {
+  white-space: nowrap;
 }
 
 .contrib-table .title {
   font-weight: 800;
+  font-size: 13px;
+}
+
+.contrib-table th:first-child,
+.contrib-table td:first-child {
+  min-width: 240px;
+  width: 240px;
+  overflow: visible;
+}
+
+.contrib-label {
+  display: inline-block;
+  max-width: 210px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .contrib-table .major-row {
@@ -470,24 +575,40 @@ input[type="month"] {
 
 .bar-track {
   position: relative;
-  width: 100%;
-  max-width: 140px;
-  height: 12px;
+  width: 86px;
+  max-width: 86px;
+  height: 10px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
+}
+
+.bar-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.bar-number {
+  font-variant-numeric: tabular-nums;
+  color: rgba(233, 237, 245, 0.92);
+  font-weight: 700;
+  line-height: 1.1;
 }
 
 .bar-fill {
   position: absolute;
   top: 0;
   bottom: 0;
-  background: linear-gradient(90deg, #38bdf8, #22d3ee);
+  background: linear-gradient(90deg, #fb923c, #f97316);
   border-radius: 10px;
 }
 
 .bar-fill.neg {
-  background: linear-gradient(90deg, #a5b4fc, #38bdf8);
+  background: linear-gradient(90deg, #38bdf8, #0ea5e9);
 }
 
 .heat-chip {

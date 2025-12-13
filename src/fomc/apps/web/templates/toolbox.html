@@ -165,30 +165,78 @@
     });
   });
 
-  const renderMarkdownLite = (text = "") => {
-    const escapeHtml = (str) => str.replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch] || ch));
-    const lines = text.split(/\r?\n/);
-    let html = "";
-    for (const line of lines) {
-      if (!line.trim()) {
-        html += "<br>";
-        continue;
-      }
-      const headingMatch = line.match(/^(#+)\s+(.*)$/);
-      if (headingMatch) {
-        const hashes = headingMatch[1].length;
-        const tag = hashes === 1 ? "h3" : hashes === 2 ? "h4" : "h5";
-        html += `<${tag}>${escapeHtml(headingMatch[2])}</${tag}>`;
-        continue;
-      }
-      if (line.startsWith("- ")) {
-        html += `<div class="pill-inline">• ${escapeHtml(line.slice(2))}</div>`;
-      } else {
-        html += `<p>${escapeHtml(line)}</p>`;
-      }
-    }
-    return html;
-  };
+	  const renderMarkdownLite = (text = "") => {
+	    const escapeHtml = (str) =>
+	      (str || "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch] || ch));
+
+	    const renderInline = (escaped) => {
+	      let s = escaped || "";
+	      // Inline code
+	      s = s.replace(/`([^`]+?)`/g, "<code>$1</code>");
+	      // Markdown links
+	      s = s.replace(/\[([^\]]+?)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+	      // Auto-link raw URLs
+	      s = s.replace(/(^|[\s(])((https?:\/\/)[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+	      // Bold / Italic
+	      s = s.replace(/\*\*([^*]+?)\*\*/g, "<strong>$1</strong>");
+	      s = s.replace(/(^|[^*])\*([^*]+?)\*(?!\*)/g, "$1<em>$2</em>");
+	      return s;
+	    };
+
+	    const lines = (text || "").replace(/\r/g, "").split("\n");
+	    const out = [];
+	    let inUl = false;
+	    let inOl = false;
+	    const closeLists = () => {
+	      if (inUl) out.push("</ul>");
+	      if (inOl) out.push("</ol>");
+	      inUl = false;
+	      inOl = false;
+	    };
+
+	    for (const raw of lines) {
+	      const line = raw || "";
+	      if (!line.trim()) {
+	        closeLists();
+	        continue;
+	      }
+
+	      const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+	      if (headingMatch) {
+	        closeLists();
+	        const level = Math.min(4, Math.max(2, headingMatch[1].length + 1)); // map # -> h2, ## -> h3, ### -> h4
+	        out.push(`<h${level}>${renderInline(escapeHtml(headingMatch[2]))}</h${level}>`);
+	        continue;
+	      }
+
+	      const olMatch = line.match(/^\s*\d+\.\s+(.*)$/);
+	      if (olMatch) {
+	        if (!inOl) {
+	          closeLists();
+	          out.push('<ol class="md-list">');
+	          inOl = true;
+	        }
+	        out.push(`<li>${renderInline(escapeHtml(olMatch[1]))}</li>`);
+	        continue;
+	      }
+
+	      const ulMatch = line.match(/^\s*-\s+(.*)$/);
+	      if (ulMatch) {
+	        if (!inUl) {
+	          closeLists();
+	          out.push('<ul class="md-list">');
+	          inUl = true;
+	        }
+	        out.push(`<li>${renderInline(escapeHtml(ulMatch[1]))}</li>`);
+	        continue;
+	      }
+
+	      closeLists();
+	      out.push(`<p>${renderInline(escapeHtml(line))}</p>`);
+	    }
+	    closeLists();
+	    return out.join("");
+	  };
 
   const themeColors = (() => {
     const styles = getComputedStyle(document.documentElement);
@@ -236,24 +284,24 @@
     const maxContrib = absMax(rows, "contribution");
     const maxDelta = absMax(rows, "delta_contribution");
 
-    const format = (val) => (val === null || val === undefined || Number.isNaN(Number(val)) ? "—" : Number(val).toFixed(2));
-    const bar = (val, max) => {
-      if (val === null || val === undefined || Number.isNaN(Number(val))) {
-        return `<span style="color:${themeColors.muted}">—</span>`;
-      }
-      const safeMax = max || 1;
-      const width = Math.min(100, Math.abs(Number(val)) / safeMax * 100);
-      const isPos = Number(val) >= 0;
-      const align = isPos ? "left:0;" : `left:${100 - width}%;`;
-      return `
-        <div style="display:flex; align-items:center; gap:10px; min-width:160px;">
-          <span>${format(val)}</span>
-          <div class="bar-track">
-            <div class="bar-fill ${isPos ? "" : "neg"}" style="width:${width}%; ${align}"></div>
-          </div>
-        </div>
-      `;
-    };
+	    const format = (val) => (val === null || val === undefined || Number.isNaN(Number(val)) ? "—" : Number(val).toFixed(2));
+	    const bar = (val, max) => {
+	      if (val === null || val === undefined || Number.isNaN(Number(val))) {
+	        return `<span style="color:${themeColors.muted}">—</span>`;
+	      }
+	      const safeMax = max || 1;
+	      const width = Math.min(100, Math.abs(Number(val)) / safeMax * 100);
+	      const isPos = Number(val) >= 0;
+	      const align = isPos ? "left:0;" : `left:${100 - width}%;`;
+	      return `
+	        <div class="bar-cell">
+	          <div class="bar-number">${format(val)}</div>
+	          <div class="bar-track">
+	            <div class="bar-fill ${isPos ? "" : "neg"}" style="width:${width}%; ${align}"></div>
+	          </div>
+	        </div>
+	      `;
+	    };
     const heat = (val, max) => {
       if (val === null || val === undefined || Number.isNaN(Number(val))) {
         return `<span style="color:${themeColors.muted}">—</span>`;
@@ -296,36 +344,37 @@
     const collapsed = contribCollapseState[mode];
 
     const table = document.createElement("table");
-    table.className = "contrib-table";
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th>分项</th>
-          <th>权重(%)</th>
-          <th>本月(%)</th>
-          <th>拉动(ppts)</th>
-          <th>上月(%)</th>
-          <th>上月拉动</th>
-          <th>差异</th>
-        </tr>
-      </thead>
-    `;
+	    table.className = "contrib-table";
+	    table.innerHTML = `
+	      <thead>
+	        <tr>
+	          <th>分项</th>
+	          <th>权重(%)</th>
+	          <th>本月(%)</th>
+	          <th>拉动(ppts)</th>
+	          <th>上月(%)</th>
+	          <th>上月拉动(ppts)</th>
+	          <th>差异(ppts)</th>
+	        </tr>
+	      </thead>
+	    `;
     const tbody = document.createElement("tbody");
 
-    const renderNode = (node, ancestorCollapsed) => {
-      if (ancestorCollapsed) return;
-      const hasChildren = node.children && node.children.length > 0;
-      const isCollapsed = collapsed.has(node.label);
-      const indentPx = (node.level || 0) * 14;
-      const tr = document.createElement("tr");
-      if (node.is_major && node.level === 0) tr.classList.add("major-row");
-      tr.innerHTML = `
-        <td>
-          <div style="display:flex; align-items:center; gap:8px; padding-left:${indentPx}px;">
-            ${hasChildren ? `<button class="tree-toggle" data-label="${node.label}" data-mode="${mode}">${isCollapsed ? "▸" : "▾"}</button>` : '<span class="tree-leaf"></span>'}
-            <span class="${node.level === 0 ? "title" : ""}">${node.label || "—"}</span>
-          </div>
-        </td>
+	    const renderNode = (node, ancestorCollapsed) => {
+	      if (ancestorCollapsed) return;
+	      const hasChildren = node.children && node.children.length > 0;
+	      const isCollapsed = collapsed.has(node.label);
+	      const indentPx = (node.level || 0) * 14;
+	      const tr = document.createElement("tr");
+	      if (node.is_major && node.level === 0) tr.classList.add("major-row");
+	      const safeLabel = (node.label || "—").replace(/"/g, "&quot;");
+	      tr.innerHTML = `
+	        <td>
+	          <div style="display:flex; align-items:center; gap:8px; padding-left:${indentPx}px;">
+	            ${hasChildren ? `<button class="tree-toggle" data-label="${node.label}" data-mode="${mode}">${isCollapsed ? "▸" : "▾"}</button>` : '<span class="tree-leaf"></span>'}
+	            <span class="contrib-label ${node.level === 0 ? "title" : ""}" title="${safeLabel}">${node.label || "—"}</span>
+	          </div>
+	        </td>
         <td>${format(node.weight)}</td>
         <td>${bar(node.current, maxChange)}</td>
         <td>${bar(node.contribution, maxContrib)}</td>
@@ -893,33 +942,49 @@
     });
   }
 
-  function insertTablesIntoReport(container, tableMap, titleMap = {}) {
-    if (!container || !tableMap) return;
-    const used = new Set();
-    const anchors = Array.from(container.querySelectorAll("h2,h3,h4,h5,p"));
-    anchors.forEach((node) => {
-      const match = (node.textContent || "").match(/表\s*(\d+)/);
-      if (!match) return;
-      const idx = match[1];
-      const key = `table${idx}`;
-      const tableEl = tableMap[key];
-      if (!tableEl || used.has(key)) return;
-      const titleEl = tableEl.querySelector(".figure-title");
-      if (titleMap[idx] && titleEl) titleEl.textContent = titleMap[idx];
-      let anchor = node.nextElementSibling;
-      while (anchor && anchor.tagName === "BR") {
-        anchor = anchor.nextElementSibling;
-      }
-      if (anchor && !/^H[1-6]$/.test(anchor.tagName)) {
-        anchor.before(tableEl);
-      } else {
-        node.after(tableEl);
-      }
-      used.add(key);
-    });
-    Object.keys(tableMap || {}).forEach((key) => {
-      if (used.has(key)) return;
-      const idx = key.replace("table", "");
+	  function insertTablesIntoReport(container, tableMap, titleMap = {}) {
+	    if (!container || !tableMap) return;
+	    const used = new Set();
+	    const headings = Array.from(container.querySelectorAll("h2,h3,h4,h5"));
+
+	    const nextHeading = (node) => {
+	      let cur = node?.nextElementSibling;
+	      while (cur) {
+	        if (/^H[1-6]$/.test(cur.tagName)) return cur;
+	        cur = cur.nextElementSibling;
+	      }
+	      return null;
+	    };
+
+	    const lastContentBefore = (node, stopNode) => {
+	      let cur = node?.nextElementSibling;
+	      let last = null;
+	      while (cur && cur !== stopNode) {
+	        if (cur.tagName !== "BR") last = cur;
+	        cur = cur.nextElementSibling;
+	      }
+	      return last;
+	    };
+
+	    headings.forEach((node) => {
+	      const match = (node.textContent || "").match(/表\s*(\d+)/);
+	      if (!match) return;
+	      const idx = match[1];
+	      const key = `table${idx}`;
+	      const tableEl = tableMap[key];
+	      if (!tableEl || used.has(key)) return;
+	      const titleEl = tableEl.querySelector(".figure-title");
+	      if (titleMap[idx] && titleEl) titleEl.textContent = titleMap[idx];
+	      const stop = nextHeading(node);
+	      const last = lastContentBefore(node, stop);
+	      if (last) last.after(tableEl);
+	      else if (stop) stop.before(tableEl);
+	      else node.after(tableEl);
+	      used.add(key);
+	    });
+	    Object.keys(tableMap || {}).forEach((key) => {
+	      if (used.has(key)) return;
+	      const idx = key.replace("table", "");
       const tableEl = tableMap[key];
       const titleEl = tableEl?.querySelector?.(".figure-title");
       if (titleMap[idx] && titleEl) titleEl.textContent = titleMap[idx];
