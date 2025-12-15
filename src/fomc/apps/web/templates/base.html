@@ -23,14 +23,15 @@
       </div>
       <div class="nav-links">
         <a href="/">主页</a>
-        <span class="chip disabled">美联储 101（待上线）</span>
+        <a href="/fed101">美联储 101</a>
         <a href="/history">历史会议模拟</a>
         <a href="/toolbox">工具箱</a>
+        <a class="minor" href="/techdocs">技术文档</a>
       </div>
     </div>
   </header>
   {% endif %}
-  <main class="page">
+  <main class="page {% if page_class %}{{ page_class }}{% endif %}">
     {% block content %}{% endblock %}
   </main>
 </body>

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero-card">
+    <div class="pill">TechDocs · 技术文档</div>
+    <h1 style="margin-top: 10px;">把“它怎么实现的”讲清楚</h1>
+    <p class="lede" style="margin-bottom: 14px;">这里不做产品介绍，只解释实现：模块边界、关键代码入口、数据流与缓存位置。</p>
+    <div class="actions">
+      {% if chapters and chapters|length > 0 %}
+      <a class="btn" href="/techdocs/{{ chapters[0].slug }}">开始阅读</a>
+      {% endif %}
+      <a class="btn secondary" href="/fed101">回到美联储 101</a>
+      <a class="btn secondary" href="/history">去历史会议模拟</a>
+    </div>
+  </div>
+</section>
+
+<section class="landing-section">
+  <div class="section-head">
+    <h3 class="section-title">目录</h3>
+    <div class="section-subtitle">每页尽量包含：入口文件、关键函数、输出落盘位置。</div>
+  </div>
+  <div class="grid feature-grid">
+    {% for c in chapters %}
+    {% if c.depth == 0 %}
+      <a class="card link-card" href="/techdocs/{{ c.slug }}">
+        <div class="title">{{ c.title }}</div>
+        <div class="muted">{{ c.summary or "点击进入文档" }}</div>
+        <div class="chips">
+          <span class="chip">{{ c.slug }}</span>
+        </div>
+      </a>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
+

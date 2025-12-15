@@ -1,45 +1,75 @@
-# 联邦货币 LLM 委员会（FOMC）项目
+# FOMC Portal（联邦公开市场委员会 · 学习/模拟/工具）
 
-以“工具 + 教学 + 沉浸式流程”帮助用户理解美联储货币政策决策。愿景、交互骨架与路线图详见 `docs/PROJECT_COMPASS.md`。
+这个项目用同一套底层能力，提供三种入口，帮助用户理解并复现 FOMC 的决策骨架：
 
-## 仓库结构
-- `docs/`：项目指南针与开发蓝图。
-- `src/fomc/`：统一代码包（保持单一顶级包便于安装/导入）  
-  - `config/`：路径与 .env 加载  
-  - `infra/`：数据库引擎、统一 LLM 客户端  
-  - `data/`：指标抓取/图表、宏观事件流水线与数据库模型  
-  - `reports/`：LLM 研报生成（非农/CPI）  
-  - `apps/`：统一 Web 门户（FastAPI + 内嵌 Flask 报告服务）、CLI 脚本  
-- `data/`：运行期 SQLite 文件（`data/fomc_data.db`、`data/macro_events.db`）。
-- `references/`：旧版子项目代码，仅供参考，不参与运行。
+- **美联储 101（学习）**：文档式学习 + 可运行小组件（`/fed101`）
+- **历史会议模拟（流程）**：按 `meeting_id` 重放会议窗口，生成并缓存材料（`/history`）
+- **工具箱（工具）**：把研报、模型、数据浏览拆成独立工具随时调用（`/toolbox`）
 
-## 功能概览
-- Web 门户（`/toolbox`）：宏观事件、经济数据浏览/数据库管理、非农研报、CPI 研报、政策规则（泰勒规则等）。
-- 历史会议模拟（`/history`）：按会议时间线生成/缓存会议材料（宏观事件、NFP、CPI、Taylor），并可运行 LLM 委员讨论→投票→生成 Statement/Minutes。
-- 数据层：FRED 指标库 + 宏观事件库（SQLite），支持增量同步与浏览。
-- 研报层：基于指标与图表生成研报文本，并可导出 PDF（如安装 Playwright）。
+愿景、体验骨架与路线图：`docs/PROJECT_COMPASS.md`  
+技术实现说明（TechDocs）：`/techdocs`（内容在 `content/techdocs/`）
 
-## 快速使用
+## 你能做什么
+
+- **Fed101**：按“研究方法论”读懂数据/研报/规则/沟通，并能在同一页跑小组件验证
+- **历史会议模拟**：生成/缓存会议材料（宏观事件、NFP、CPI、规则模型、讨论、决议/沟通）并复盘
+- **工具箱**：指标库同步与浏览、宏观事件月报、NFP/CPI 研报生成、Taylor 规则建模
+
+## 快速开始
+
 ```bash
 # 1) 安装依赖（建议虚拟环境）
 pip install -r requirements.txt
-# 2) 以可编辑方式安装包，注册 src/fomc 为可导入模块
+
+# 2) 以可编辑方式安装包（让 src/fomc 可被导入）
 pip install -e .
-# 3) 初始化/更新数据库（FRED API 需配置 FRED_API_KEY）
+
+# 3) 初始化指标数据库（首次运行）
 python -m fomc.apps.cli.init_database
+
+# 4) 同步指标数据（需要 FRED_API_KEY）
 python -m fomc.apps.cli.process_all_indicators --start-date 2010-01-01
-# 4) 启动统一门户（http://localhost:9000）
+
+# 5) 启动 Web 门户（http://127.0.0.1:9000）
 uvicorn fomc.apps.web.main:app --app-dir src --reload --port 9000
 ```
 
-## 运行与数据管理说明
-- 环境变量：在仓库根创建 `.env`，至少包含 `FRED_API_KEY`，可选 `DEEPSEEK_API_KEY`。  
-- 数据库：默认路径 `data/fomc_data.db`（指标/研报）和 `data/macro_events.db`（宏观事件），`fomc.config.paths` 统一管理并在缺失时自动创建目录。  
-- CLI：`python -m fomc.apps.cli.init_database` 创建表；`python -m fomc.apps.cli.process_all_indicators` 同步指标；宏观事件可通过 Web 入口触发刷新。  
-- 工具箱：可在「经济数据」中执行同步/单指标刷新/健康检查；在「政策规则」中计算利率规则模型并可调节平滑系数 ρ。  
-- 历史会议模拟：会议级材料与产物会落盘到 `data/meeting_runs/<meeting_id>/`（含 `manifest.json` 与各类 `.md` 工件），便于复现与缓存命中。
-- Web：推荐 `uvicorn fomc.apps.web.main:app --app-dir src --reload --port 9000`；如不开 reloader 可去掉 `--reload`。
+## 环境变量（.env）
 
-## 下一阶段：美联储 101（学习模式）
-- 目标：把“数据/研报/规则模型/沟通材料”的关键概念做成短章节 + 可执行小组件，并与历史会议流程互链（在流程页可随时打开解释卡）。
-- 状态：入口已预留（Web 顶部导航显示“美联储 101（待上线）”），下一阶段将补齐页面、章节结构与组件化解释内容。
+在仓库根目录创建 `.env`：
+
+- `FRED_API_KEY`：同步经济指标所需（没有它也能启动门户，但图表/模型可能无数据）
+- `DEEPSEEK_API_KEY`：使用 LLM 能力所需（宏观事件摘要、会议讨论/投票、Statement/Minutes 生成等）
+
+LLM 相关可选配置：`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`、`DEEPSEEK_TIMEOUT`、`DEEPSEEK_RETRIES`（见 `src/fomc/infra/llm.py`）。
+
+## 数据与缓存落点
+
+- 指标数据库：`data/fomc_data.db`（见 `src/fomc/config/paths.py`）
+- 宏观事件库：`data/macro_events.db`
+- 历史会议产物缓存：`data/meeting_runs/<meeting_id>/`
+  - 读写封装：`src/fomc/data/meetings/run_store.py`
+  - 典型产物：宏观摘要、NFP/CPI 研报、规则模型结果、讨论过程、Statement/Minutes 生成稿等
+
+## 仓库结构（当前实现）
+
+- `src/fomc/apps/web/`：FastAPI + Jinja 门户（页面路由、模板、静态资源）
+- `src/fomc/apps/web/backend.py`：门户集成层（把数据/研报/模型/LLM 串起来）
+- `src/fomc/data/`：指标库、宏观事件、会议日历与落盘缓存
+- `src/fomc/reports/`：研报生成（NFP/CPI）
+- `src/fomc/rules/`、`src/fomc/data/modeling/`：规则模型（Taylor 系列）
+- `content/fed101/`：Fed101 内容（Markdown + `fomc-cell`）
+- `content/techdocs/`：技术文档内容（Markdown）
+- `docs/`：项目指南针与开发蓝图（含目标架构：`docs/development.md`）
+
+## 导航入口（启动后）
+
+- 主页：`http://127.0.0.1:9000/`
+- 美联储 101：`http://127.0.0.1:9000/fed101`
+- 历史会议模拟：`http://127.0.0.1:9000/history`
+- 工具箱：`http://127.0.0.1:9000/toolbox`
+- 技术文档：`http://127.0.0.1:9000/techdocs`
+
+## 可选：研报 PDF 导出
+
+项目包含 PDF 导出依赖（Playwright）。如需使用，通常还需要安装浏览器运行时（按 Playwright 官方方式安装）。
