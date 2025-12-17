@@ -659,6 +659,7 @@
     renderMarkdownLite,
     renderLabor,
     renderCpi,
+    renderContribTable,
   };
 })();
 

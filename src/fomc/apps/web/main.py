@@ -48,6 +48,8 @@ from .backend import (
 from fomc.data.database.connection import SessionLocal
 from fomc.data.modeling.taylor_service import build_taylor_series_from_db
 from fomc.rules.taylor_rule import ModelType
+from .fed101 import get_fed101_chapter, list_fed101_chapters, run_fed101_cell
+from .techdocs import get_techdocs_chapter, list_techdocs_chapters
 
 load_env()
 
@@ -91,6 +93,85 @@ def history_page(request: Request) -> HTMLResponse:
             "timeline_start": "2010-01-01",
             "timeline_end": "2027-12-31",
             "history_cutoff": "2025-12-31",
+        },
+    )
+
+
+@app.get("/fed101", response_class=HTMLResponse)
+def fed101_index_page(request: Request) -> HTMLResponse:
+    chapters = list_fed101_chapters()
+    return TEMPLATES.TemplateResponse("fed101_index.html", {"request": request, "chapters": chapters, "page_class": "docs"})
+
+
+@app.get("/fed101/{slug:path}", response_class=HTMLResponse)
+def fed101_chapter_page(request: Request, slug: str) -> HTMLResponse:
+    try:
+        chapters = list_fed101_chapters()
+        meta, chapter_html, _cells = get_fed101_chapter(slug)
+    except PortalError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    meeting_id = str(request.query_params.get("meeting_id") or "").strip() or None
+    current_idx = None
+    for i, c in enumerate(chapters):
+        if c.slug == meta.slug:
+            current_idx = i
+            break
+    prev_chapter = chapters[current_idx - 1].as_dict() if current_idx is not None and current_idx > 0 else None
+    next_chapter = chapters[current_idx + 1].as_dict() if current_idx is not None and current_idx + 1 < len(chapters) else None
+    return TEMPLATES.TemplateResponse(
+        "fed101_chapter.html",
+        {
+            "request": request,
+            "chapters": chapters,
+            "chapter": meta.as_dict(),
+            "chapter_html": chapter_html,
+            "meeting_id": meeting_id,
+            "prev_chapter": prev_chapter,
+            "next_chapter": next_chapter,
+            "page_class": "docs",
+        },
+    )
+
+
+@app.get("/techdocs", response_class=HTMLResponse)
+def techdocs_index_page(request: Request) -> HTMLResponse:
+    chapters = list_techdocs_chapters()
+    return TEMPLATES.TemplateResponse(
+        "techdocs_index.html",
+        {"request": request, "chapters": chapters, "page_class": "docs"},
+    )
+
+
+@app.get("/techdocs/{slug:path}", response_class=HTMLResponse)
+def techdocs_chapter_page(request: Request, slug: str) -> HTMLResponse:
+    try:
+        chapters = list_techdocs_chapters()
+        meta, chapter_html = get_techdocs_chapter(slug)
+    except PortalError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    current_idx = None
+    for i, c in enumerate(chapters):
+        if c.slug == meta.slug:
+            current_idx = i
+            break
+    prev_chapter = chapters[current_idx - 1].as_dict() if current_idx is not None and current_idx > 0 else None
+    next_chapter = chapters[current_idx + 1].as_dict() if current_idx is not None and current_idx + 1 < len(chapters) else None
+    return TEMPLATES.TemplateResponse(
+        "techdocs_chapter.html",
+        {
+            "request": request,
+            "chapters": chapters,
+            "chapter": meta.as_dict(),
+            "chapter_html": chapter_html,
+            "prev_chapter": prev_chapter,
+            "next_chapter": next_chapter,
+            "page_class": "docs",
         },
     )
 
@@ -588,6 +669,27 @@ def api_models_taylor(payload: TaylorModelPayload):
         raise HTTPException(status_code=400, detail=str(exc))
     finally:
         session.close()
+
+
+class Fed101CellPayload(BaseModel):
+    type: str = Field(..., description="Cell type")
+    params: dict = Field(default_factory=dict)
+    context: dict = Field(default_factory=dict)
+
+
+@app.get("/api/fed101/chapters")
+def api_fed101_chapters():
+    return [c.as_dict() for c in list_fed101_chapters()]
+
+
+@app.post("/api/fed101/cell")
+def api_fed101_cell(payload: Fed101CellPayload):
+    try:
+        return run_fed101_cell(payload.type, payload.params, payload.context)
+    except PortalError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 if __name__ == "__main__":

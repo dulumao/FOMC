@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="learning-shell">
+  <aside class="learning-sidebar">
+    <div class="card">
+      <div class="title">技术文档</div>
+      <div class="muted" style="font-size: 13px; line-height: 1.7;">
+        解释实现方式：模块边界、关键入口、数据流与输出位置。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">文档</div>
+      <div class="learning-toc">
+        {% for p in chapters if p.depth == 0 %}
+          {% set is_open = chapter.slug == p.slug or chapter.slug.startswith(p.slug + "/") %}
+          <div class="toc-section">
+            <a class="toc-parent {% if chapter.slug == p.slug %}active{% endif %}" href="/techdocs/{{ p.slug }}">
+              <span class="toc-dot"></span>
+              <span class="toc-parent-title">{{ p.title }}</span>
+            </a>
+            <div class="toc-children {% if is_open %}open{% endif %}">
+              {% for c in chapters if c.slug.startswith(p.slug + "/") %}
+                <a class="toc-item child {% if c.slug == chapter.slug %}active{% endif %}" href="/techdocs/{{ c.slug }}">
+                  <span class="toc-branch"></span>
+                  <span class="toc-title">{{ c.title }}</span>
+                </a>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </aside>
+
+  <section class="learning-main">
+    <article class="card learning-article">
+      <div class="learning-breadcrumbs">
+        <a href="/techdocs">TechDocs</a>
+        <span class="muted">/</span>
+        <span class="muted">{{ chapter.slug }}</span>
+      </div>
+      <h1 class="learning-title">{{ chapter.title }}</h1>
+      {% if chapter.summary %}
+      <div class="learning-summary">{{ chapter.summary }}</div>
+      {% endif %}
+      <div class="learning-md report-body">{{ chapter_html | safe }}</div>
+
+      <div class="learning-pager">
+        {% if prev_chapter %}
+          <a class="pager-card" href="/techdocs/{{ prev_chapter.slug }}">
+            <div class="pager-label">上一页</div>
+            <div class="pager-title">{{ prev_chapter.title }}</div>
+            <div class="pager-meta">{{ prev_chapter.slug }}</div>
+          </a>
+        {% else %}
+          <div class="pager-card disabled">
+            <div class="pager-label">上一页</div>
+            <div class="pager-title">—</div>
+          </div>
+        {% endif %}
+
+        {% if next_chapter %}
+          <a class="pager-card" href="/techdocs/{{ next_chapter.slug }}">
+            <div class="pager-label">下一页</div>
+            <div class="pager-title">{{ next_chapter.title }}</div>
+            <div class="pager-meta">{{ next_chapter.slug }}</div>
+          </a>
+        {% else %}
+          <div class="pager-card disabled">
+            <div class="pager-label">下一页</div>
+            <div class="pager-title">—</div>
+          </div>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+
+  <aside class="learning-outline">
+    <div class="card">
+      <div class="title">本页目录</div>
+      <div class="muted" style="font-size: 13px; line-height: 1.7;">根据标题结构自动生成。</div>
+      <div class="outline-list" id="techdocs-outline"></div>
+    </div>
+
+    <div class="card">
+      <div class="title">相关入口</div>
+      <div class="chips">
+        <a class="chip" href="/fed101">美联储 101</a>
+        <a class="chip" href="/history">历史会议模拟</a>
+        <a class="chip" href="/toolbox">工具箱</a>
+      </div>
+      <div class="muted" style="font-size: 13px; line-height: 1.7; margin-top: 10px;">需要对照界面时，用它们跳转即可。</div>
+    </div>
+  </aside>
+</div>
+
+<button class="docs-fab" id="techdocs-toc-open" type="button" title="打开目录">目录</button>
+<div class="docs-overlay" id="techdocs-toc-overlay" aria-hidden="true">
+  <div class="docs-overlay-card">
+    <div class="docs-overlay-head">
+      <div class="title">目录</div>
+      <button class="btn secondary" id="techdocs-toc-close" type="button">关闭</button>
+    </div>
+    <div class="field-row" style="gap:10px; margin-top: 10px;">
+      <input class="input" id="techdocs-toc-filter" placeholder="搜索文档…" style="flex:1;" />
+    </div>
+    <div class="learning-toc docs-overlay-toc" id="techdocs-toc-list">
+      {% for c in chapters %}
+        <a class="toc-item {% if c.depth > 0 %}child{% endif %} {% if c.slug == chapter.slug %}active{% endif %}" data-slug="{{ c.slug }}" data-title="{{ c.title }}" href="/techdocs/{{ c.slug }}">
+          <div class="toc-title" style="margin-left: {{ 14 * c.depth }}px;">{% if c.depth > 0 %}• {% endif %}{{ c.title }}</div>
+          <div class="toc-meta">{{ c.slug }}</div>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script src="/static/techdocs.js"></script>
+{% endblock %}
+

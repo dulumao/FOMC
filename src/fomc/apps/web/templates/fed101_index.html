@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero-card">
+    <div class="pill">Fed101 · 文档式学习</div>
+    <h1 style="margin-top: 10px;">把一次 FOMC 决策“跑起来”</h1>
+    <p class="lede" style="margin-bottom: 14px;">用文档的方式学习，用小组件把关键节点跑一遍：数据/研报 → 规则基准线 → 决议与沟通。</p>
+    <div class="actions">
+      {% if chapters and chapters|length > 0 %}
+      <a class="btn" href="/fed101/{{ chapters[0].slug }}">开始阅读</a>
+      {% endif %}
+      <a class="btn secondary" href="/history">去历史会议模拟</a>
+      <a class="btn secondary" href="/toolbox">打开工具箱</a>
+    </div>
+  </div>
+</section>
+
+<section class="landing-section">
+  <div class="section-head">
+    <h3 class="section-title">章节</h3>
+    <div class="section-subtitle">推荐顺序：开始之前 → 数据篇 → 规则篇 → 沟通篇。</div>
+  </div>
+  <div class="grid feature-grid">
+    {% for c in chapters %}
+    {% if c.depth == 0 %}
+      <a class="card link-card" href="/fed101/{{ c.slug }}">
+        <div class="title">{{ c.title }}</div>
+        <div class="muted">{{ c.summary or "点击进入章节" }}</div>
+        <div class="chips">
+          {% if c.flow_step %}<span class="chip">流程位置：{{ c.flow_step }}</span>{% endif %}
+          <span class="chip">{{ c.slug }}</span>
+        </div>
+      </a>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

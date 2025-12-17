@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="learning-shell">
+  <aside class="learning-sidebar">
+    <div class="card">
+      <div class="title">美联储 101</div>
+      <div class="muted" style="font-size: 13px; line-height: 1.7;">
+        像项目文档一样读：左侧是目录，右侧是内容。小组件用来“把概念跑起来”，不是装饰品。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">文档</div>
+      <div class="learning-toc">
+        {% for p in chapters if p.depth == 0 %}
+          {% set is_open = chapter.slug == p.slug or chapter.slug.startswith(p.slug + "/") %}
+          <div class="toc-section">
+            <a class="toc-parent {% if chapter.slug == p.slug %}active{% endif %}" href="/fed101/{{ p.slug }}{% if meeting_id %}?meeting_id={{ meeting_id }}{% endif %}">
+              <span class="toc-dot"></span>
+              <span class="toc-parent-title">{{ p.title }}</span>
+            </a>
+            <div class="toc-children {% if is_open %}open{% endif %}">
+              {% for c in chapters if c.slug.startswith(p.slug + "/") %}
+                <a class="toc-item child {% if c.slug == chapter.slug %}active{% endif %}" href="/fed101/{{ c.slug }}{% if meeting_id %}?meeting_id={{ meeting_id }}{% endif %}">
+                  <span class="toc-branch"></span>
+                  <span class="toc-title">{{ c.title }}</span>
+                </a>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </aside>
+
+  <section class="learning-main">
+    <article class="card learning-article">
+      <div class="learning-breadcrumbs">
+        <a href="/fed101{% if meeting_id %}?meeting_id={{ meeting_id }}{% endif %}">Fed101</a>
+        <span class="muted">/</span>
+        <span class="muted">{{ chapter.slug }}</span>
+      </div>
+      <h1 class="learning-title">{{ chapter.title }}</h1>
+      {% if chapter.summary %}
+      <div class="learning-summary">{{ chapter.summary }}</div>
+      {% endif %}
+      <div class="learning-md report-body">{{ chapter_html | safe }}</div>
+
+      <div class="learning-pager">
+        {% if prev_chapter %}
+          <a class="pager-card" href="/fed101/{{ prev_chapter.slug }}{% if meeting_id %}?meeting_id={{ meeting_id }}{% endif %}">
+            <div class="pager-label">上一页</div>
+            <div class="pager-title">{{ prev_chapter.title }}</div>
+            <div class="pager-meta">{{ prev_chapter.slug }}</div>
+          </a>
+        {% else %}
+          <div class="pager-card disabled">
+            <div class="pager-label">上一页</div>
+            <div class="pager-title">—</div>
+          </div>
+        {% endif %}
+
+        {% if next_chapter %}
+          <a class="pager-card" href="/fed101/{{ next_chapter.slug }}{% if meeting_id %}?meeting_id={{ meeting_id }}{% endif %}">
+            <div class="pager-label">下一页</div>
+            <div class="pager-title">{{ next_chapter.title }}</div>
+            <div class="pager-meta">{{ next_chapter.slug }}</div>
+          </a>
+        {% else %}
+          <div class="pager-card disabled">
+            <div class="pager-label">下一页</div>
+            <div class="pager-title">—</div>
+          </div>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+
+  <aside class="learning-outline">
+    <div class="card">
+      <div class="title">本页目录</div>
+      <div class="muted" style="font-size: 13px; line-height: 1.7;">跟随当前文档的标题结构生成。</div>
+      <div class="outline-list" id="fed101-outline"></div>
+    </div>
+
+    <div class="card">
+      <div class="title">示例会议</div>
+      <div class="muted" style="font-size: 13px; line-height: 1.7;">选一个 `meeting_id` 作为全局视角。</div>
+      <div class="field-row" style="gap:10px; margin-top: 10px; flex-wrap: wrap;">
+        <select id="fed101-meeting" class="select" style="flex:1; min-width: 0;">
+          <option value="">（不选择：Latest）</option>
+        </select>
+        <button class="btn secondary" id="fed101-apply" type="button">应用</button>
+        {% if meeting_id %}
+        <a class="btn secondary" href="/history/{{ meeting_id }}/overview">去会议流程</a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if meeting_id %}
+    <div class="card">
+      <div class="title">会议快捷入口</div>
+      <div class="chips">
+        <a class="chip" href="/history/{{ meeting_id }}/macro/events">宏观事件</a>
+        <a class="chip" href="/history/{{ meeting_id }}/nfp">NFP</a>
+        <a class="chip" href="/history/{{ meeting_id }}/cpi">CPI</a>
+        <a class="chip" href="/history/{{ meeting_id }}/model">规则模型</a>
+        <a class="chip" href="/history/{{ meeting_id }}/decision">决议/纪要</a>
+      </div>
+      <div class="muted" style="font-size: 13px; line-height: 1.7; margin-top: 10px;">去原材料页看全文与生成结果。</div>
+    </div>
+    {% endif %}
+  </aside>
+</div>
+
+<button class="fed101-fab" id="fed101-toc-open" type="button" title="打开目录">目录</button>
+<div class="fed101-overlay" id="fed101-toc-overlay" aria-hidden="true">
+  <div class="fed101-overlay-card">
+    <div class="fed101-overlay-head">
+      <div class="title">目录</div>
+      <button class="btn secondary" id="fed101-toc-close" type="button">关闭</button>
+    </div>
+    <div class="card" style="margin-top: 12px;">
+      <div class="title">示例会议</div>
+      <div class="field-row" style="gap:10px; flex-wrap: wrap; margin-top: 10px;">
+        <select id="fed101-meeting-mobile" class="select" style="flex:1;">
+          <option value="">（不选择：Latest）</option>
+        </select>
+        <button class="btn secondary" id="fed101-apply-mobile" type="button">应用</button>
+      </div>
+    </div>
+    <div class="field-row" style="gap:10px; margin-top: 10px;">
+      <input class="input" id="fed101-toc-filter" placeholder="搜索章节…" style="flex:1;" />
+    </div>
+    <div class="learning-toc fed101-overlay-toc" id="fed101-toc-list">
+      {% for c in chapters %}
+        <a class="toc-item {% if c.depth > 0 %}child{% endif %} {% if c.slug == chapter.slug %}active{% endif %}" data-slug="{{ c.slug }}" data-title="{{ c.title }}" href="/fed101/{{ c.slug }}{% if meeting_id %}?meeting_id={{ meeting_id }}{% endif %}">
+          <div class="toc-title" style="margin-left: {{ 14 * c.depth }}px;">{% if c.depth > 0 %}• {% endif %}{{ c.title }}</div>
+          <div class="toc-meta">{{ c.slug }}</div>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+  window.Fed101Context = {
+    meeting_id: {{ (meeting_id or "") | tojson }},
+  };
+</script>
+<script src="/static/report_render.js"></script>
+<script src="/static/fed101.js"></script>
+{% endblock %}
