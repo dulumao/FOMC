@@ -1167,35 +1167,34 @@ input[type="month"] {
   margin-right: auto;
 }
 
-.report-body h2,
+.report-body h2 {
+  width: 100%;
+  max-width: 640px;
+  margin: 18px auto 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(34, 211, 238, 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  letter-spacing: 0.3px;
+  font-size: 20px;
+  font-weight: 900;
+}
+
 .report-body h3,
 .report-body h4,
 .report-body h5 {
   width: 100%;
   max-width: 640px;
-  margin: 14px auto 8px;
+  margin: 12px auto 6px;
   padding: 10px 12px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(34, 211, 238, 0.06));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   letter-spacing: 0.2px;
-}
-
-.report-body h2 {
-  font-size: 18px;
-  font-weight: 900;
-}
-
-.report-body h3 {
   font-size: 16px;
-  font-weight: 850;
-}
-
-.report-body h4,
-.report-body h5 {
-  font-size: 14px;
-  font-weight: 800;
+  font-weight: 750;
   opacity: 0.96;
 }
 
