@@ -75,9 +75,55 @@ header {
   height: 34px;
   border-radius: 12px;
   background: linear-gradient(135deg, #22d3ee, #0ea5e9);
-  display: grid;
-  place-items: center;
+  position: relative;
+  overflow: hidden;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 10px 25px rgba(0, 0, 0, 0.25);
+}
+
+.brand .glyph .flow-node {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e6f6ff;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.18);
+  z-index: 2;
+}
+
+.brand .glyph .node-a {
+  left: 8px;
+  top: 9px;
+}
+
+.brand .glyph .node-b {
+  left: 20px;
+  top: 15px;
+}
+
+.brand .glyph .node-c {
+  left: 8px;
+  top: 23px;
+}
+
+.brand .glyph .flow-link {
+  position: absolute;
+  height: 2px;
+  width: 14px;
+  background: rgba(224, 242, 254, 0.85);
+  border-radius: 999px;
+  z-index: 1;
+}
+
+.brand .glyph .link-a {
+  left: 11px;
+  top: 12px;
+  transform: rotate(18deg);
+}
+
+.brand .glyph .link-b {
+  left: 11px;
+  top: 21px;
+  transform: rotate(-18deg);
 }
 
 .nav-links {
@@ -1469,6 +1515,30 @@ input[type="month"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 10px;
+}
+
+.macro-months {
+  gap: 6px;
+}
+
+.macro-month-btn {
+  width: 100%;
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.6);
+  color: rgba(226, 232, 240, 0.9);
+  font-size: 12.5px;
+  padding: 6px 10px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.macro-month-btn:hover {
+  border-color: rgba(125, 211, 252, 0.4);
+  background: rgba(30, 41, 59, 0.75);
+  color: rgba(241, 245, 249, 0.95);
 }
 
 .macro-events {

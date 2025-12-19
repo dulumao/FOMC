@@ -2,7 +2,7 @@
 slug: web
 title: Web 门户
 order: 10
-summary: FastAPI + Jinja 的单页式门户：Fed101 / 历史会议模拟 / 工具箱都从这里出入口。
+summary: FastAPI + Jinja 的单页式门户：FOMC101 / 历史会议模拟 / 工具箱都从这里出入口。
 ---
 
 # Web 门户
@@ -26,6 +26,6 @@ summary: FastAPI + Jinja 的单页式门户：Fed101 / 历史会议模拟 / 工�
 
 ## 三个入口对应什么
 
-- 美联储 101：`/fed101` 与 `src/fomc/apps/web/fed101.py`
+- FOMC101：`/fed101` 与 `src/fomc/apps/web/fed101.py`
 - 历史会议模拟：`/history/...`，主要逻辑在 `src/fomc/apps/web/backend.py`
 - 工具箱：`/toolbox`，同样通过 `src/fomc/apps/web/backend.py` 暴露数据与研报/模型接口

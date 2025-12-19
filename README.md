@@ -1,8 +1,15 @@
 # FOMC Studio（联邦公开市场委员会 · 学习/模拟/工具）
 
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Uvicorn](https://img.shields.io/badge/Uvicorn-0.27-222222?style=flat-square)](https://www.uvicorn.org/)
+[![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-d71f00?style=flat-square&logo=sqlalchemy&logoColor=white)](https://www.sqlalchemy.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.49-45ba4b?style=flat-square&logo=playwright&logoColor=white)](https://playwright.dev/python/)
+
 这个项目用同一套底层能力，提供三种入口，帮助用户理解并复现 FOMC 的决策骨架：
 
-- **美联储 101（学习）**：文档式学习 + 可运行小组件（`/fed101`）
+- **FOMC101（学习）**：文档式学习 + 可运行小组件（`/fed101`）
 - **历史会议模拟（流程）**：按 `meeting_id` 重放会议窗口，生成并缓存材料（`/history`）
 - **工具箱（工具）**：把研报、模型、数据浏览拆成独立工具随时调用（`/toolbox`）
 
@@ -14,8 +21,8 @@
 ### 主页
 <img src="docs/assets/screenshots/homepage.png" alt="主页" width="900" />
 
-### 美联储101
-<img src="docs/assets/screenshots/fed101.png" alt="Fed101" width="900" />
+### FOMC101
+<img src="docs/assets/screenshots/fed101.png" alt="FOMC101" width="900" />
 
 ### 历史会议模拟
 <img src="docs/assets/screenshots/history.png" alt="历史会议模拟" width="900" />
@@ -37,7 +44,7 @@
 
 ## 你能做什么
 
-- **Fed101**：按“研究方法论”读懂数据/研报/规则/沟通，并能在同一页跑小组件验证
+- **FOMC101**：按“研究方法论”读懂数据/研报/规则/沟通，并能在同一页跑小组件验证
 - **历史会议模拟**：生成/缓存会议材料（宏观事件、NFP、CPI、规则模型、讨论、决议/沟通）并复盘
 - **工具箱**：指标库同步与浏览、宏观事件月报、NFP/CPI 研报生成、Taylor 规则建模
 
@@ -84,14 +91,14 @@ LLM 相关可选配置：`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`、`DEEPSEEK_TIME
 - `src/fomc/data/`：指标库、宏观事件、会议日历与落盘缓存
 - `src/fomc/reports/`：研报生成（NFP/CPI）
 - `src/fomc/rules/`、`src/fomc/data/modeling/`：规则模型（Taylor 系列）
-- `content/fed101/`：Fed101 内容（Markdown + `fomc-cell`）
+- `content/fed101/`：FOMC101 内容（Markdown + `fomc-cell`）
 - `content/techdocs/`：技术文档内容（Markdown）
 - `docs/`：项目指南针与开发蓝图（含目标架构：`docs/development.md`）
 
 ## 导航入口（启动后）
 
 - 主页：`http://127.0.0.1:9000/`
-- 美联储 101：`http://127.0.0.1:9000/fed101`
+- FOMC101：`http://127.0.0.1:9000/fed101`
 - 历史会议模拟：`http://127.0.0.1:9000/history`
 - 工具箱：`http://127.0.0.1:9000/toolbox`
 - 技术文档：`http://127.0.0.1:9000/techdocs`
@@ -99,3 +106,77 @@ LLM 相关可选配置：`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`、`DEEPSEEK_TIME
 ## 可选：研报 PDF 导出
 
 项目包含 PDF 导出依赖（Playwright）。如需使用，通常还需要安装浏览器运行时（按 Playwright 官方方式安装）。
+
+---
+
+## 后续优化计划（聚焦功能调优，暂不做框架迁移）
+
+当前版本的主要功能链路已跑通。后续迭代将优先聚焦“LLM 可控性/可调参性、宏观事件检索质量、研报 prompt 可维护性”，并**暂不推进 Flask → FastAPI 迁移**（迁移属于结构统一工作，短期对输出质量提升有限且引入回归风险）。
+
+### 1) LLM Module（可控性/可复现实验）
+
+目标：让 prompt/参数/输出更可控、更稳定、更便于对比迭代。
+
+- **Prompt 版本化与可追溯**：为关键 prompt 增加 `prompt_version`，在产物/缓存 meta 中记录 `model/temperature/max_tokens/time/cost(可选)`。
+- **结构化输出的校验与自修复**：对“必须是 JSON 的输出”（如 blackboard、筛选结果）做 schema 校验；失败时触发“修复重写”重试路径。
+- **统一调用规范**：所有模块统一走 `src/fomc/infra/llm.py`，集中管理超时/重试/退避与错误信息。
+- **可选缓存策略**：对“输入不变→输出可复用”的调用提供缓存（如按 `hash(prompt+params)`），避免重复消耗与加速调试。
+
+### 2) Macro Events Module（检索质量）
+
+目标：提升事件召回的相关性与信噪比，减少重复事件，提升“月报/会议窗口摘要”的可靠性。
+
+- **Query 扩展**：按 `report_type` 定制查询集合；对同主题使用多种等价表述（inflation/jobs/financial conditions 等）并加入时间窗提示。
+- **Source 策略**：
+  - 引入**硬白名单**（如 Reuters/FT/WSJ/Bloomberg 等）作为高权重来源；
+  - 同时保留非白名单来源作为补充召回，但在打分/排序中显式降权。
+- **排序与过滤**：将“来源可信度 + 多源交叉验证 + 内容相关性 + 事件冲击类型”纳入重要度评分，并与现有 LLM 二次重排结合。
+- **聚类优化**：从当前粗粒度聚类（如按日期/类型）升级到“标题/摘要相似度聚类”，更好合并同一事件的多条报道。
+
+### 3) Report Module（NFP/CPI prompt 工程化）
+
+目标：让你可以快速调整研报 prompt（学习券商研究报告写法后自行迭代），同时保持输出格式稳定。
+
+- **Prompt 外置与热更新**：将 NFP/CPI 的 prompt 模板外置为可编辑文件（如 `content/prompts/`），代码只负责加载与注入结构化数据。
+- **Prompt 结构更清晰**：将模板拆成固定槽位（核心结论/驱动拆解/事件校验/FOMC 含义/风险提示），减少跑题并提高可比性。
+- **输入数据块标准化**：继续使用结构化指标摘要（如 `IndicatorSummary`）与贡献拆分文本，确保“缺失就声明缺失、禁止编造”。
+- **展示与调参便利性**：在页面或日志中提供“本次生成实际使用的 prompt（截断版）+ 参数”以便你快速迭代。
+- **可选：多智能体（Multi-Agent）研报生成流程**：将研报生成拆成“起草→质检→改写→定稿”的多角色协作，提高一致性与可解释性（不要求引入 LangChain，先以轻量函数编排实现）。建议角色与产出：
+  - `DataBrief Agent`：只基于输入指标/图表摘要输出“数据要点清单”（禁止观点扩展）。
+  - `Narrative Agent`：基于数据要点清单起草研报正文（按固定槽位输出）。
+  - `Consistency/No-Hallucination Agent`：逐条检查是否引用了未提供的数据/行业分项，输出“问题清单 + 修改建议”。
+  - `Style/Editor Agent`：按券商写作习惯压缩冗余、强化逻辑递进与措辞一致性，输出终稿。
+  - （可选）`FOMC Policy Lens Agent`：把结论映射到“偏鹰/偏鸽因素”，但必须严格引用输入与事件脉络，不做预测。
+  - （可选）`Risk Agent`：给出 2-3 条风险提示，并要求明确传导渠道（通胀/就业/增长/金融条件）。
+  - 关键护栏：每轮都记录 `agent_role/prompt_version/input_hash/output_hash`，并在最终产物里附“引用的输入块列表/缺失声明”。
+
+### 4) FOMC101 内容优化（学习路径与可交互性）
+
+目标：让 FOMC101 更像“可学习、可验证、可复用”的课程内容，而不仅是静态文档展示。
+
+- **章节结构统一**：每章固定为“概念 → 指标/数据口径 → 规则/框架 → 例子（历史窗口）→ 小结与练习题”。  
+- **与工具箱/历史模拟联动**：在章节中提供一键跳转/预填参数（例如跳到某个 `meeting_id` 或某个月份的指标/宏观事件）。  
+- **fomc-cell 小组件扩展**：沉淀常用组件（如通胀分解、就业/参与率关系、Taylor 输入项解释）并复用到多章。  
+- **内容版本化**：为章节内容增加版本号与更新日志，方便课堂展示“迭代痕迹”。  
+
+### 5) 数据管理与可维护性（会议材料与全局数据）
+
+目标：让“某次会议（meeting_id）的材料/产物”以及全局数据库的**增删查改**更顺畅、更可追溯、更易维护；减少“缓存混乱/重复生成/难以清理”的成本。
+
+- **会议材料（meeting_runs）CRUD 与一致性**：
+  - 为每个 `meeting_id` 明确支持：创建/读取/刷新（rebuild）/删除（清理）/导出（打包下载）的完整闭环。
+  - 强化 `manifest.json`：记录每个 artifact 的 `kind/path/updated_at/meta`，并补充 `source_hash`（输入数据与 prompt/参数的哈希），便于判断“是否需要重跑”。
+  - 统一命名与状态：为每类材料定义固定 `kind` 集合与生成状态（missing/cached/stale/running/failed），页面与 API 以同一套状态展示。
+- **全局数据库（指标库/宏观事件库）治理**：
+  - 引入 schema 迁移工具（如 Alembic）与版本号，避免“本地 DB 结构漂移”导致不可复现。
+  - 为关键查询补索引与健康检查（数据缺口、最近更新时间、异常值），并在工具箱提供可视化诊断。
+  - 明确数据生命周期：缓存保留策略、定期清理策略、备份/恢复流程（尤其是 `data/` 下的多个 SQLite 文件）。
+- **可追溯与可审计**：
+  - 对 LLM 生成产物保存最小必要的“生成证据”：使用的 prompt 版本/参数、引用的输入块、缺失声明与错误信息（避免仅保存最终文本）。
+  - （可选）提供 `run_id` 概念：允许同一 `meeting_id` 下保存多次运行结果用于对比，而不是覆盖写入。
+
+### 非目标（本阶段不做）
+
+- 不做 Electron/Flutter 桌面化与多端重写。
+- 不做后端高并发/分布式架构。
+- 暂不做 Flask → FastAPI 迁移（除非后续确有统一入口/维护成本需要）。

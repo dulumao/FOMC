@@ -47,7 +47,7 @@
             <option value="asc">按时间升序</option>
           </select>
         </div>
-        <div id="macro-months" class="grid" style="gap:8px;"></div>
+        <div id="macro-months" class="grid macro-months"></div>
       </div>
 
       <div>
@@ -710,7 +710,7 @@
       if (!resp.ok) throw new Error(data.detail || "加载失败");
       status.textContent = "";
       listEl.innerHTML = (data || []).map((row) => {
-        return `<button class="btn" style="width:100%; text-align:left;" data-month="${row.month_key}">${row.month_key} · ${row.status}</button>`;
+        return `<button class="macro-month-btn" data-month="${row.month_key}">${row.month_key} · ${row.status}</button>`;
       }).join("");
       listEl.querySelectorAll("button").forEach(btn => {
         btn.addEventListener("click", () => {

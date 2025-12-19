@@ -20,7 +20,7 @@ summary: Taylor 系列规则：输入指标、参数假设、输出路径，以�
 - 数据准备与计算服务：`src/fomc/data/modeling/taylor_service.py`
   - `build_taylor_series_from_db(...)`
 - 门户 API：`POST /api/models/taylor`（见 `src/fomc/apps/web/main.py`）
-- Fed101 cell：`src/fomc/apps/web/fed101.py`（`taylor_model`）
+- FOMC101 cell：`src/fomc/apps/web/fed101.py`（`taylor_model`）
 
 ## 输入与默认值（常用）
 
@@ -32,5 +32,5 @@ summary: Taylor 系列规则：输入指标、参数假设、输出路径，以�
 ## 常见问题定位
 
 - 结果为一条水平线/全空：优先检查指标 DB 是否已同步、code 是否存在
-- 与会议窗口对不齐：检查是否使用了 `use_meeting_end`（Fed101 会用示例会议对齐）
+- 与会议窗口对不齐：检查是否使用了 `use_meeting_end`（FOMC101 会用示例会议对齐）
 

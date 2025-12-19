@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FOMC Studio</title>
+  <link rel="icon" href="/static/brand/fomc-mark.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -15,7 +16,13 @@
   <header>
     <div class="nav">
       <div class="brand">
-        <div class="glyph">S</div>
+        <div class="glyph" aria-hidden="true">
+          <span class="flow-link link-a"></span>
+          <span class="flow-link link-b"></span>
+          <span class="flow-node node-a"></span>
+          <span class="flow-node node-b"></span>
+          <span class="flow-node node-c"></span>
+        </div>
         <div>
           <div>FOMC Studio</div>
           <div class="pill">学习 / 模拟 / 工具箱</div>
@@ -23,7 +30,7 @@
       </div>
       <div class="nav-links">
         <a href="/">主页</a>
-        <a href="/fed101">美联储 101</a>
+        <a href="/fed101">FOMC101</a>
         <a href="/history">历史会议模拟</a>
         <a href="/toolbox">工具箱</a>
         <a class="minor" href="/techdocs">技术文档</a>
