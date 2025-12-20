@@ -540,6 +540,9 @@
 
   // 宏观事件
   document.getElementById("btn-macro-refresh").addEventListener("click", () => fetchMacro(true));
+  document.getElementById("macro-month").addEventListener("change", (ev) => {
+    macroCurrentMonth = ev.target.value;
+  });
   document.getElementById("btn-macro-pdf").addEventListener("click", () => {
     window.open(`/api/macro-events/pdf?month=${macroCurrentMonth}`, "_blank");
   });
@@ -670,6 +673,7 @@
   syncMacroTabs(macroMode);
 
   async function fetchMacro(refresh = false) {
+    macroCurrentMonth = document.getElementById("macro-month").value;
     const month = macroCurrentMonth;
     const status = document.getElementById("macro-status");
     const result = document.getElementById("macro-result");

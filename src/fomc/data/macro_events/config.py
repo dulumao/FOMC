@@ -18,6 +18,13 @@ IMPACT_CHANNELS = [
     "financial_conditions",
 ]
 
+HIGH_TRUST_DOMAINS = {
+    "reuters.com",
+    "ft.com",
+    "wsj.com",
+    "bloomberg.com",
+}
+
 # Unified search keyword templates across macro themes.
 UNIFIED_QUERIES = [
     # Labor / employment shocks

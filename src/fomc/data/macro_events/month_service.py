@@ -18,7 +18,7 @@ from .db import (
 from .duckduckgo_client import NewsItem, search_news_ddg
 from .event_processing import cluster_candidates, filter_and_classify_news, select_top_events, enrich_events_with_llm
 from . import DEFAULT_DB_PATH
-from .llm_client import call_llm, generate_monthly_report
+from .llm_client import generate_monthly_report, extract_event_keywords
 from .article_fetcher import decide_urls_for_fetch, fetch_articles, persist_raw_articles
 
 
@@ -48,9 +48,35 @@ def _load_events_payload(payload: str | None) -> List[Dict]:
     return []
 
 
-def _query_with_time_hint(base_query: str, start_date: date) -> str:
-    # Add month/year tokens to bias DDG toward the target window.
-    return f"{base_query} {start_date:%B} {start_date:%Y}"
+def _search_queries(queries: List[str], start_date: date, end_date: date, max_results: int = 80) -> List[NewsItem]:
+    all_news: List[NewsItem] = []
+    seen_urls = set()
+    for query in queries:
+        try:
+            results = search_news_ddg(query, start_date, end_date, max_results=max_results)
+        except Exception as exc:
+            import sys
+
+            print(f"[warn] DDG search failed for query: {query} ({exc})", file=sys.stderr)
+            results = []
+        print(f"[info] DDG query='{query}' returned {len(results)} results")
+        for item in results:
+            if item.url in seen_urls:
+                continue
+            seen_urls.add(item.url)
+            all_news.append(item)
+    return all_news
+
+
+def _normalize_keyword_query(keyword: str) -> Optional[str]:
+    keyword = keyword.strip()
+    if not keyword:
+        return None
+    if not any("a" <= ch.lower() <= "z" for ch in keyword):
+        return None
+    if " " in keyword and not (keyword.startswith('"') and keyword.endswith('"')):
+        return f'"{keyword}"'
+    return keyword
 
 
 def ensure_month_events(
@@ -93,24 +119,29 @@ def ensure_month_events(
         )
 
         queries = UNIFIED_QUERIES
-        all_news: List[NewsItem] = []
-        seen_urls = set()
-        for query in queries:
-            hinted_query = _query_with_time_hint(query, start_date)
-            try:
-                results = search_news_ddg(hinted_query, start_date, end_date, max_results=80)
-            except Exception as exc:
-                # Surface failures to stderr so users know why zero results appear.
-                import sys
+        all_news = _search_queries(queries, start_date, end_date, max_results=80)
 
-                print(f"[warn] DDG search failed for query: {hinted_query} ({exc})", file=sys.stderr)
-                results = []
-            print(f"[info] DDG query='{hinted_query}' returned {len(results)} results")
-            for item in results:
-                if item.url in seen_urls:
+        if use_llm and all_news:
+            stage1_candidates = filter_and_classify_news(all_news, report_type, start_date=start_date, end_date=end_date)
+            stage1_clustered = cluster_candidates(stage1_candidates, use_llm=use_llm)
+            stage1_selected = select_top_events(stage1_clustered, max_events=max_events)
+            keywords = extract_event_keywords(stage1_selected, report_type=report_type, model=llm_model)
+            keyword_queries: List[str] = []
+            seen_keywords = set()
+            for keyword in keywords:
+                normalized = _normalize_keyword_query(keyword)
+                if not normalized or normalized.lower() in seen_keywords:
                     continue
-                seen_urls.add(item.url)
-                all_news.append(item)
+                seen_keywords.add(normalized.lower())
+                keyword_queries.append(normalized)
+            if keyword_queries:
+                stage2_news = _search_queries(keyword_queries, start_date, end_date, max_results=60)
+                existing_urls = {item.url for item in all_news}
+                for item in stage2_news:
+                    if item.url in existing_urls:
+                        continue
+                    existing_urls.add(item.url)
+                    all_news.append(item)
 
         if fetch_bodies and all_news:
             urls_to_fetch = decide_urls_for_fetch(all_news, max_urls=12, model=llm_model)
@@ -126,7 +157,7 @@ def ensure_month_events(
                 item.is_primary = False
 
         candidates = filter_and_classify_news(all_news, report_type, start_date=start_date, end_date=end_date)
-        clustered = cluster_candidates(candidates)
+        clustered = cluster_candidates(candidates, use_llm=use_llm)
         selected_events = select_top_events(clustered, max_events=max_events)
         selected_events = enrich_events_with_llm(selected_events, report_type, use_llm=use_llm, model=llm_model)
         if len(selected_events) > max_events:

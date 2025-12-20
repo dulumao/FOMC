@@ -84,6 +84,46 @@ def llm_rank_and_filter(events: List[Dict], model: Optional[str] = None) -> List
     return events
 
 
+def extract_event_keywords(
+    events: List[Dict],
+    report_type: str,
+    model: Optional[str] = None,
+    max_keywords: int = 12,
+) -> List[str]:
+    """
+    Extract event-level search keywords for stage-2 retrieval.
+    """
+    if not events:
+        return []
+    prompt = (
+        "你是一名宏观研究助理。给定当月事件列表（JSON），提炼可用于新闻检索的关键词/短语，"
+        "每条 2-6 个词，尽量具体（含实体/指标/事件名）。请只输出英文关键词/短语。"
+        "输出 JSON 数组，不要解释。"
+        f"最多 {max_keywords} 条。\n\n事件列表：\n"
+    )
+    body = prompt + str(events)
+    resp = call_llm(
+        [
+            {"role": "system", "content": "你只返回 JSON 数组。"},
+            {"role": "user", "content": body},
+        ],
+        model=model,
+        max_tokens=256,
+    )
+    keywords: List[str] = []
+    try:
+        import json
+
+        data = json.loads(resp.strip())
+        if isinstance(data, list):
+            keywords = [str(item).strip() for item in data if str(item).strip()]
+    except Exception:
+        raw = resp.replace("\n", ",")
+        parts = [p.strip(" -\t\r\"'") for p in raw.split(",")]
+        keywords = [p for p in parts if p]
+    return keywords[:max_keywords]
+
+
 def generate_monthly_report(events: List[Dict], model: Optional[str] = None) -> Optional[str]:
     if not events:
         return None

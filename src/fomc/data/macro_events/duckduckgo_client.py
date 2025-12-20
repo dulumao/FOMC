@@ -86,8 +86,11 @@ def search_news_ddg(query: str, start_date: date, end_date: date, max_results: i
             snippet = result.get("body") or result.get("snippet")
             source_domain = result.get("source") or urlparse(url).netloc
 
+            # Require a parsed date to keep month slicing strict.
+            if not published_at:
+                continue
             # Python-side date filtering to approximate monthly slices.
-            if published_at and (published_at < start_date or published_at > end_date):
+            if published_at < start_date or published_at > end_date:
                 continue
 
             items.append(

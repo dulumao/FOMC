@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import date
-from typing import Dict, List, Optional
+import json
+import re
+from typing import Dict, List, Optional, Sequence
 
-from .config import IMPACT_CHANNELS, MACRO_SHOCK_TYPES
+from .config import HIGH_TRUST_DOMAINS, IMPACT_CHANNELS, MACRO_SHOCK_TYPES
 from .duckduckgo_client import NewsItem
 
 
@@ -124,73 +127,200 @@ def filter_and_classify_news(
     return candidates
 
 
-def cluster_candidates(candidates: List[MacroEventCandidate]) -> List[Dict]:
-    """
-    Merge similar candidates into macro events.
-    Currently groups by (date, macro_shock_type) and aggregates sources.
-    """
-    clusters: Dict[tuple, Dict] = {}
-    for cand in candidates:
-        key = (cand.date, cand.macro_shock_type)
-        if key not in clusters:
-            clusters[key] = {
-                "date": cand.date,
-                "macro_shock_type": cand.macro_shock_type,
-                "impact_channel": set(cand.impact_channel),
-                "countries": set(cand.countries),
-                "summaries": [cand.summary_zh],
-                "source_meta": [
-                    {
-                        "title": cand.source_title,
-                        "url": cand.source_url,
-                        "domain": cand.source_domain,
-                        "important": cand.is_primary,
-                    }
-                ],
-            }
-        else:
-            cluster = clusters[key]
-            cluster["impact_channel"].update(cand.impact_channel)
-            cluster["countries"].update(cand.countries)
-            cluster["summaries"].append(cand.summary_zh)
-            cluster["source_meta"].append(
-                {
-                    "title": cand.source_title,
-                    "url": cand.source_url,
-                    "domain": cand.source_domain,
-                    "important": cand.is_primary,
-                }
-            )
+def _bucket_key(candidate: MacroEventCandidate) -> tuple:
+    impact = candidate.impact_channel[0] if candidate.impact_channel else "growth"
+    country = candidate.countries[0] if candidate.countries else "US"
+    return (candidate.macro_shock_type, impact, country)
 
-    high_quality_domains = {"wsj.com", "ft.com", "reuters.com", "bloomberg.com"}
+
+def _bucket_candidates(candidates: Sequence[MacroEventCandidate]) -> Dict[tuple, List[MacroEventCandidate]]:
+    buckets: Dict[tuple, List[MacroEventCandidate]] = defaultdict(list)
+    for cand in candidates:
+        buckets[_bucket_key(cand)].append(cand)
+    return buckets
+
+
+def _normalize_title(title: str) -> str:
+    if not title:
+        return ""
+    text = re.sub(r"[^a-z0-9]+", " ", title.lower())
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _extract_json_list(text: str) -> Optional[List]:
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict) and isinstance(data.get("clusters"), list):
+            return data.get("clusters")
+        if isinstance(data, list):
+            return data
+    except Exception:
+        pass
+    start = text.find("[")
+    end = text.rfind("]")
+    if start >= 0 and end > start:
+        try:
+            return json.loads(text[start : end + 1])
+        except Exception:
+            return None
+    return None
+
+
+def _cluster_items_with_llm(items: List[Dict]) -> Optional[List[List[int]]]:
+    try:
+        from .llm_client import call_llm
+    except Exception:
+        return None
+    prompt = (
+        "你是一名新闻事件聚类器。给定若干条新闻条目，请按“是否描述同一宏观事件”聚类。"
+        "必须覆盖全部索引且不重复。输出 JSON 数组，每个元素包含 members 列表。"
+        "示例: [{\"members\":[0,2]}, {\"members\":[1]}]。不要解释。\n\n条目：\n"
+    )
+    body = prompt + json.dumps(items, ensure_ascii=True)
+    resp = call_llm(
+        [
+            {"role": "system", "content": "你只返回 JSON。"},
+            {"role": "user", "content": body},
+        ],
+        max_tokens=400,
+    )
+    data = _extract_json_list(resp.strip())
+    if not data:
+        return None
+    clusters: List[List[int]] = []
+    for entry in data:
+        if isinstance(entry, dict):
+            members = entry.get("members")
+        else:
+            members = entry
+        if not isinstance(members, list):
+            continue
+        idxs = [i for i in members if isinstance(i, int)]
+        if idxs:
+            clusters.append(idxs)
+    if not clusters:
+        return None
+    return clusters
+
+
+def _merge_cluster(cands: List[MacroEventCandidate]) -> Dict:
+    dates = [c.date for c in cands if c.date]
+    date_value = min(dates) if dates else ""
+    shock_counts = Counter(c.macro_shock_type for c in cands if c.macro_shock_type)
+    macro_shock_type = shock_counts.most_common(1)[0][0] if shock_counts else "other"
+    impact_channels = sorted({ch for c in cands for ch in c.impact_channel})
+    countries = sorted({cty for c in cands for cty in c.countries})
+    summaries = [c.summary_zh for c in cands if c.summary_zh]
+    source_meta = [
+        {
+            "title": c.source_title,
+            "url": c.source_url,
+            "domain": c.source_domain,
+            "important": c.is_primary,
+        }
+        for c in cands
+    ]
+    domains_all = [s.get("domain") for s in source_meta if s.get("domain")]
+    domain_bonus = sum(1 for d in domains_all if d in HIGH_TRUST_DOMAINS)
+    importance_score = len(source_meta) + 0.5 * domain_bonus
+    primary_meta = [s for s in source_meta if s.get("important")]
+    supp_meta = [s for s in source_meta if not s.get("important")]
+    source_titles = [s.get("title") for s in source_meta]
+    source_urls = [s.get("url") for s in source_meta]
+    source_domains = domains_all
+    title = ""
+    for meta in primary_meta + source_meta:
+        if meta.get("title"):
+            title = meta["title"]
+            break
+    return {
+        "date": date_value,
+        "macro_shock_type": macro_shock_type,
+        "impact_channel": impact_channels,
+        "countries": countries,
+        "importance_score": importance_score,
+        "title": title,
+        "summary_zh": "；".join(summaries),
+        "summary_en": None,
+        "source_titles": source_titles,
+        "source_urls": source_urls,
+        "source_domains": source_domains,
+        "source_meta": source_meta,
+        "primary_urls": [s.get("url") for s in primary_meta if s.get("url")],
+        "supplementary_urls": [s.get("url") for s in supp_meta if s.get("url")],
+    }
+
+
+def _fallback_cluster(candidates: List[MacroEventCandidate]) -> List[Dict]:
+    clusters: Dict[str, List[MacroEventCandidate]] = defaultdict(list)
+    for cand in candidates:
+        key = _normalize_title(cand.source_title) or cand.source_url
+        clusters[key].append(cand)
+    return [_merge_cluster(cands) for cands in clusters.values()]
+
+
+def _cluster_bucket(candidates: List[MacroEventCandidate], max_bucket: int = 24) -> List[Dict]:
+    if not candidates:
+        return []
+    items = [
+        {
+            "idx": idx,
+            "title": cand.source_title,
+            "summary": cand.summary_zh,
+            "source": cand.source_domain,
+        }
+        for idx, cand in enumerate(candidates)
+    ]
+    if len(items) <= max_bucket:
+        clusters = _cluster_items_with_llm(items)
+        if clusters:
+            return [_merge_cluster([candidates[i] for i in cluster if 0 <= i < len(candidates)]) for cluster in clusters]
+        return _fallback_cluster(candidates)
+
+    chunked_clusters: List[List[MacroEventCandidate]] = []
+    for start in range(0, len(items), max_bucket):
+        chunk_items = items[start : start + max_bucket]
+        chunk_candidates = candidates[start : start + max_bucket]
+        clusters = _cluster_items_with_llm(chunk_items)
+        if not clusters:
+            chunked_clusters.extend([[c] for c in chunk_candidates])
+            continue
+        for cluster in clusters:
+            chunked_clusters.append([chunk_candidates[i] for i in cluster if 0 <= i < len(chunk_candidates)])
+
+    rep_items: List[Dict] = []
+    for idx, cluster in enumerate(chunked_clusters):
+        rep_title = cluster[0].source_title if cluster else ""
+        rep_summary = "；".join(c.summary_zh for c in cluster if c.summary_zh)[:240]
+        rep_items.append({"idx": idx, "title": rep_title, "summary": rep_summary, "source": cluster[0].source_domain if cluster else ""})
+
+    rep_clusters = _cluster_items_with_llm(rep_items)
+    if not rep_clusters:
+        return [_merge_cluster(cluster) for cluster in chunked_clusters]
+
     merged: List[Dict] = []
-    for cluster in clusters.values():
-        domains_all = [s.get("domain") for s in cluster["source_meta"] if s.get("domain")]
-        domain_bonus = sum(1 for d in domains_all if d in high_quality_domains)
-        importance_score = len(cluster["source_meta"]) + 0.5 * domain_bonus
-        primary_meta = [s for s in cluster["source_meta"] if s.get("important")]
-        supp_meta = [s for s in cluster["source_meta"] if not s.get("important")]
-        source_titles = [s.get("title") for s in cluster["source_meta"]]
-        source_urls = [s.get("url") for s in cluster["source_meta"]]
-        source_domains = domains_all
-        merged.append(
-            {
-                "date": cluster["date"],
-                "macro_shock_type": cluster["macro_shock_type"],
-                "impact_channel": sorted(cluster["impact_channel"]),
-                "countries": sorted(cluster["countries"]),
-                "importance_score": importance_score,
-                "title": source_titles[0] if source_titles else "",
-                "summary_zh": "；".join(cluster["summaries"]),
-                "summary_en": None,
-                "source_titles": source_titles,
-                "source_urls": source_urls,
-                "source_domains": source_domains,
-                "source_meta": cluster["source_meta"],
-                "primary_urls": [s.get("url") for s in primary_meta if s.get("url")],
-                "supplementary_urls": [s.get("url") for s in supp_meta if s.get("url")],
-            }
-        )
+    for rep_cluster in rep_clusters:
+        merged_candidates: List[MacroEventCandidate] = []
+        for rep_idx in rep_cluster:
+            if 0 <= rep_idx < len(chunked_clusters):
+                merged_candidates.extend(chunked_clusters[rep_idx])
+        if merged_candidates:
+            merged.append(_merge_cluster(merged_candidates))
+    return merged
+
+
+def cluster_candidates(candidates: List[MacroEventCandidate], use_llm: bool = True) -> List[Dict]:
+    """
+    Merge similar candidates into macro events using LLM clustering with bucketing.
+    """
+    if not candidates:
+        return []
+    if not use_llm:
+        return _fallback_cluster(candidates)
+    buckets = _bucket_candidates(candidates)
+    merged: List[Dict] = []
+    for bucket_candidates in buckets.values():
+        merged.extend(_cluster_bucket(bucket_candidates))
     return merged
 
 

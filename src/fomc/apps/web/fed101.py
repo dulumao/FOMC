@@ -225,7 +225,10 @@ def get_fed101_chapter(slug: str) -> tuple[Fed101ChapterMeta, str, list[dict[str
 
     body_with_cells, cells = _extract_cells(body)
     body_with_cells = _strip_leading_h1(body_with_cells)
-    html_body = markdown2.markdown(body_with_cells, extras=["autolink", "break-on-newline", "fenced-code-blocks"])
+    html_body = markdown2.markdown(
+        body_with_cells,
+        extras=["autolink", "break-on-newline", "fenced-code-blocks", "cuddled-lists", "code-friendly"],
+    )
     return chapter_meta, html_body, cells
 
 
