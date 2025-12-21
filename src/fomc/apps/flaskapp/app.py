@@ -1328,13 +1328,19 @@ def export_labor_market_report_pdf():
         <style>
           .pdf-head { font-family: 'Times New Roman', 'KaiTi', serif; font-size: 12px; width: 100%; padding: 10px 22px 8px; color: #4a5568; display:flex; justify-content: space-between; align-items: center; box-sizing:border-box; }
           .pdf-head .brand { display:flex; align-items:center; gap:14px; font-weight:700; letter-spacing:0.35px; }
-          .pdf-head .icon { width:30px; height:30px; border-radius:10px; background:linear-gradient(135deg,#1b2f60,#2f6bff); position:relative; box-shadow:0 8px 20px rgba(31,63,130,0.24), inset 0 1px 0 rgba(255,255,255,0.15); display:grid; place-items:center; }
+          .pdf-head .icon { width:30px; height:30px; border-radius:10px; background:linear-gradient(135deg,#1b2f60,#2f6bff); position:relative; box-shadow:0 8px 20px rgba(31,63,130,0.24), inset 0 1px 0 rgba(255,255,255,0.15); }
           .pdf-head .icon::after { content:\"\"; position:absolute; inset:4px; border-radius:8px; border:1px solid rgba(255,255,255,0.35); box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06); }
-          .pdf-head .icon span { position:relative; z-index:1; color:#f9fbff; font-size:13px; font-weight:800; font-family:'Times New Roman', serif; letter-spacing:0.4px; }
+          .pdf-head .icon .node { position:absolute; width:6px; height:6px; border-radius:50%; background:#f9fbff; box-shadow:0 0 0 2px rgba(27,47,96,0.25); z-index:2; }
+          .pdf-head .icon .node-a { left:7px; top:8px; }
+          .pdf-head .icon .node-b { left:18px; top:14px; }
+          .pdf-head .icon .node-c { left:7px; top:21px; }
+          .pdf-head .icon .link { position:absolute; height:2px; width:12px; background:rgba(249,251,255,0.85); border-radius:999px; z-index:1; }
+          .pdf-head .icon .link-a { left:10px; top:11px; transform:rotate(18deg); }
+          .pdf-head .icon .link-b { left:10px; top:19px; transform:rotate(-18deg); }
           .pdf-head .tagline { font-weight:650; color:#374151; font-size: 11.5px; }
         </style>
         <div class="pdf-head">
-          <div class="brand"><span class="icon"><span>F</span></span><span>Fed Tools · 非农研判</span></div>
+          <div class="brand"><span class="icon"><span class="link link-a"></span><span class="link link-b"></span><span class="node node-a"></span><span class="node node-b"></span><span class="node node-c"></span></span><span>FOMC Tools · 非农研判</span></div>
           <div class="tagline">就业脉络 · 数据洞见</div>
         </div>
         """
@@ -1450,13 +1456,19 @@ def export_cpi_report_pdf():
         <style>
           .pdf-head { font-family: 'Times New Roman', 'KaiTi', serif; font-size: 12px; width: 100%; padding: 10px 22px 8px; color: #4a5568; display:flex; justify-content: space-between; align-items: center; box-sizing:border-box; }
           .pdf-head .brand { display:flex; align-items:center; gap:14px; font-weight:700; letter-spacing:0.35px; }
-          .pdf-head .icon { width:30px; height:30px; border-radius:10px; background:linear-gradient(135deg,#f97316,#fb923c); position:relative; box-shadow:0 8px 20px rgba(244,114,35,0.22), inset 0 1px 0 rgba(255,255,255,0.2); display:grid; place-items:center; }
+          .pdf-head .icon { width:30px; height:30px; border-radius:10px; background:linear-gradient(135deg,#f97316,#fb923c); position:relative; box-shadow:0 8px 20px rgba(244,114,35,0.22), inset 0 1px 0 rgba(255,255,255,0.2); }
           .pdf-head .icon::after { content:""; position:absolute; inset:4px; border-radius:8px; border:1px solid rgba(255,255,255,0.35); box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06); }
-          .pdf-head .icon span { position:relative; z-index:1; color:#fffaf0; font-size:13px; font-weight:800; font-family:'Times New Roman', serif; letter-spacing:0.4px; }
+          .pdf-head .icon .node { position:absolute; width:6px; height:6px; border-radius:50%; background:#fffaf0; box-shadow:0 0 0 2px rgba(154,52,18,0.2); z-index:2; }
+          .pdf-head .icon .node-a { left:7px; top:8px; }
+          .pdf-head .icon .node-b { left:18px; top:14px; }
+          .pdf-head .icon .node-c { left:7px; top:21px; }
+          .pdf-head .icon .link { position:absolute; height:2px; width:12px; background:rgba(255,250,240,0.85); border-radius:999px; z-index:1; }
+          .pdf-head .icon .link-a { left:10px; top:11px; transform:rotate(18deg); }
+          .pdf-head .icon .link-b { left:10px; top:19px; transform:rotate(-18deg); }
           .pdf-head .tagline { font-weight:650; color:#9a3412; font-size: 11.5px; }
         </style>
         <div class="pdf-head">
-          <div class="brand"><span class="icon"><span>F</span></span><span>Fed Tools · CPI研判</span></div>
+          <div class="brand"><span class="icon"><span class="link link-a"></span><span class="link link-b"></span><span class="node node-a"></span><span class="node node-b"></span><span class="node node-c"></span></span><span>FOMC Tools · CPI研判</span></div>
           <div class="tagline">通胀脉络 · 数据先行</div>
         </div>
         """

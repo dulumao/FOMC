@@ -918,25 +918,31 @@ def _render_markdown(md_text: str | None) -> str | None:
     return markdown2.markdown(md_text, extras=["autolink", "break-on-newline", "fenced-code-blocks"])
 
 
-def generate_labor_report(month: str) -> Dict[str, Any]:
+def generate_labor_report(month: str, refresh: bool = False) -> Dict[str, Any]:
     """Generate labor-market report payload via the existing Flask app."""
-    return _call_flask_json("/api/labor-market/report", {"report_month": month})
+    payload = {"report_month": month}
+    if refresh:
+        payload["refresh_llm"] = True
+    return _call_flask_json("/api/labor-market/report", payload)
 
 
-def generate_cpi_report(month: str) -> Dict[str, Any]:
+def generate_cpi_report(month: str, refresh: bool = False) -> Dict[str, Any]:
     """Generate CPI report payload via the existing Flask app."""
-    return _call_flask_json("/api/cpi/report", {"report_month": month})
+    payload = {"report_month": month}
+    if refresh:
+        payload["refresh_llm"] = True
+    return _call_flask_json("/api/cpi/report", payload)
 
 
-def export_labor_pdf(month: str) -> tuple[bytes, Dict[str, str]]:
+def export_labor_pdf(month: str, refresh: bool = False) -> tuple[bytes, Dict[str, str]]:
     """Generate labor report PDF via Flask."""
-    report = generate_labor_report(month)
+    report = generate_labor_report(month, refresh=refresh)
     return _call_flask_pdf("/api/labor-market/report.pdf", {"report_data": report})
 
 
-def export_cpi_pdf(month: str) -> tuple[bytes, Dict[str, str]]:
+def export_cpi_pdf(month: str, refresh: bool = False) -> tuple[bytes, Dict[str, str]]:
     """Generate CPI report PDF via Flask."""
-    report = generate_cpi_report(month)
+    report = generate_cpi_report(month, refresh=refresh)
     return _call_flask_pdf("/api/cpi/report.pdf", {"report_data": report})
 
 
@@ -1222,13 +1228,19 @@ def export_macro_pdf(month_key: str, refresh: bool = False) -> tuple[bytes, Dict
     <style>
       .pdf-head { font-family: 'Times New Roman','KaiTi',serif; font-size: 12px; width: 100%; padding: 10px 22px 8px; color: #0f172a; display:flex; justify-content: space-between; align-items: center; box-sizing:border-box; }
       .pdf-head .brand { display:flex; align-items:center; gap:12px; font-weight:700; letter-spacing:0.3px; }
-      .pdf-head .icon { width:30px; height:30px; border-radius:10px; background:linear-gradient(135deg,#0f766e,#0ea5e9); position:relative; box-shadow:0 8px 20px rgba(14,165,233,0.2), inset 0 1px 0 rgba(255,255,255,0.18); display:grid; place-items:center; }
+      .pdf-head .icon { width:30px; height:30px; border-radius:10px; background:linear-gradient(135deg,#0f766e,#0ea5e9); position:relative; box-shadow:0 8px 20px rgba(14,165,233,0.2), inset 0 1px 0 rgba(255,255,255,0.18); }
       .pdf-head .icon::after { content:\"\"; position:absolute; inset:4px; border-radius:8px; border:1px solid rgba(255,255,255,0.3); box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06); }
-      .pdf-head .icon span { position:relative; z-index:1; color:#e0f2fe; font-size:13px; font-weight:800; font-family:'Times New Roman', serif; letter-spacing:0.4px; }
+      .pdf-head .icon .node { position:absolute; width:6px; height:6px; border-radius:50%; background:#e0f2fe; box-shadow:0 0 0 2px rgba(15,118,110,0.2); z-index:2; }
+      .pdf-head .icon .node-a { left:7px; top:8px; }
+      .pdf-head .icon .node-b { left:18px; top:14px; }
+      .pdf-head .icon .node-c { left:7px; top:21px; }
+      .pdf-head .icon .link { position:absolute; height:2px; width:12px; background:rgba(224,242,254,0.85); border-radius:999px; z-index:1; }
+      .pdf-head .icon .link-a { left:10px; top:11px; transform:rotate(18deg); }
+      .pdf-head .icon .link-b { left:10px; top:19px; transform:rotate(-18deg); }
       .pdf-head .tagline { font-weight:650; color:#0f172a; font-size: 11.5px; }
     </style>
     <div class="pdf-head">
-      <div class="brand"><span class="icon"><span>M</span></span><span>Macro Pulse · 事件月报</span></div>
+      <div class="brand"><span class="icon"><span class="link link-a"></span><span class="link link-b"></span><span class="node node-a"></span><span class="node node-b"></span><span class="node node-c"></span></span><span>Macro Pulse · 事件月报</span></div>
       <div class="tagline">冲击脉络 · 风险前瞻</div>
     </div>
     """
