@@ -3,6 +3,8 @@ slug: studio/macro-events
 title: 宏观事件模块
 order: 51
 summary: 会议窗口内事件数据库与来源追溯。
+flow_step: 信息集-事件
+try_meeting: 2025-05-07
 ---
 
 # 宏观事件模块

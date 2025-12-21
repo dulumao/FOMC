@@ -3,6 +3,8 @@ slug: studio/reports
 title: 研报与宏观月报模块
 order: 54
 summary: 固定结构的研报生成与宏观月报复盘。
+flow_step: 研报
+try_meeting: 2025-05-07
 ---
 
 # 研报与宏观月报模块

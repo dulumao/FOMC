@@ -3,6 +3,7 @@ slug: studio/llm-module
 title: LLM Module 设计
 order: 53
 summary: 统一调用、可观测与可复盘。
+flow_step: 讨论/决议（LLM）
 ---
 
 # LLM Module 设计

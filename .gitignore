@@ -17,3 +17,6 @@ build/
 venv/
 .idea/
 .vscode/
+
+# Personal presentation materials (do not track)
+docs/presentation/
